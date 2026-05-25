@@ -30,3 +30,12 @@ Read on demand (look up "when did we decide X?"), not loaded on every
 <!-- Append real entries below this line. -->
 
 2026-05-25 · Build v1 as a TypeScript Discord app using DeepL primary, optional Google fallback, SQLite quota/settings, and Docker Compose · docs/agent/sessions/2026-05-25-214703-codex-translation-plan.md
+2026-05-25 · Defer Google Cloud Translation indefinitely; v1 ships DeepL-only (interface kept for later adapter) · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
+2026-05-25 · Use better-sqlite3 with a startup CREATE TABLE IF NOT EXISTS migrator; no ORM in v1 · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
+2026-05-25 · Cache stores translated text + source hash only by default (env opt-in CACHE_STORE_SOURCE_TEXT=true for source-text caching) · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
+2026-05-25 · Quota check-and-increment is a single atomic SQL UPDATE with WHERE clause to avoid TOCTOU between concurrent interactions · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
+2026-05-25 · Per-user daily char cap in addition to per-provider monthly cap (single friend cannot torch shared monthly budget) · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
+2026-05-25 · Drop allowed_servers table; collapse to single users.server_usage_enabled boolean for v1 · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
+2026-05-25 · Owner identity from OWNER_DISCORD_ID env only; not stored as DB row · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
+2026-05-25 · Discord MessageContent intent stays disabled; message context commands deliver target message in the interaction payload · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
+2026-05-25 · Container runs as non-root via Node official image's USER node · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md

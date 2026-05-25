@@ -1,0 +1,16 @@
+# Agent memory system — gitignore
+# This file is part of the bootstrap package. Merge with your project's
+# existing .gitignore if one already exists.
+
+# Per-machine agent notes — never commit. Holds host-specific paths,
+# ssh aliases, local container names, etc. Secrets should NEVER live
+# here either — reference them ("token in .env").
+docs/agent/LOCAL.md
+
+# Optional Codex local config that shouldn't be committed (if you choose
+# to keep machine-specific Codex config out of git):
+# .codex/auth.json
+# .codex/config.local.toml
+
+# Optional Claude local settings:
+# .claude/settings.local.json

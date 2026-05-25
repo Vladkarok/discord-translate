@@ -1,0 +1,35 @@
+# EXAMPLE — copy as .github/workflows/deploy-staging.yml and adapt.
+#
+# This file demonstrates the CI prerequisite from PROTOCOL.md (Bootstrap step 8):
+# memory-only pushes (from `publish session`) MUST NOT trigger deploys.
+#
+# Without `paths-ignore`, every `publish session` will rebuild the container
+# and bounce the staging app, even though nothing in the actual code changed.
+#
+# Keep the ignore list NARROW. Broader patterns (`docs/**`) hide real doc
+# changes that might actually need a deploy.
+
+name: Deploy staging
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "docs/agent/**"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - ".codex/**"
+      # Also typical:
+      # - "**.md"            # only if NO markdown ever needs to deploy
+      # - "docs/**"          # only if NO docs ever ship with the build
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: echo "your build steps here"
+      - name: Deploy
+        run: echo "your deploy steps here"

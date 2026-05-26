@@ -1,55 +1,66 @@
 /**
  * discord-translate — entrypoint.
  *
- * Milestones: see docs/plans/discord-translation-bot.md.
- * This is the M0 skeleton — no Discord client, no DB, no provider yet.
+ * Boot sequence (M1):
+ *   1. Load + validate env (Zod; fails fast on missing vars).
+ *   2. Register global commands unless SKIP_COMMAND_REGISTRATION=true.
+ *   3. Build discord.js Client (zero intents).
+ *   4. Attach interaction router.
+ *   5. Login. Discord gateway keep-alive owns the event loop.
+ *   6. SIGTERM/SIGINT → client.destroy() → process.exit(0).
  *
  * Run locally with:
  *   node --env-file=.env --enable-source-maps dist/index.js
  */
+import { loadConfig } from './config.js';
+import { log, setLogLevel } from './logger.js';
+import { COMMAND_DEFINITIONS } from './commands/definitions.js';
+import { registerGlobalCommands } from './commands/register.js';
+import { attachInteractionHandler, attachLifecycleLogging, createClient } from './bot/client.js';
+import { buildInteractionRouter } from './interactions/router.js';
 
-interface LogPayload {
-  readonly ts: string;
-  readonly level: 'info' | 'warn' | 'error';
-  readonly msg: string;
-  readonly [key: string]: unknown;
-}
+const main = async (): Promise<void> => {
+  const config = loadConfig();
+  setLogLevel(config.LOG_LEVEL);
 
-const log = (
-  level: LogPayload['level'],
-  msg: string,
-  extra: Record<string, unknown> = {},
-): void => {
-  const payload: LogPayload = { ts: new Date().toISOString(), level, msg, ...extra };
-  // Structured logs land here in M5. For now: one JSON line per event.
-  process.stdout.write(JSON.stringify(payload) + '\n');
-};
-
-const main = (): void => {
   log('info', 'bot.starting', { version: '0.1.0', node: process.version });
 
-  // Keep the event loop alive until a signal arrives. M1 replaces this
-  // with the discord.js gateway client, which owns its own keep-alive.
-  const heartbeat = setInterval(() => {
-    // M5: emit periodic health/quota snapshot here.
-  }, 60_000);
+  if (config.SKIP_COMMAND_REGISTRATION) {
+    log('warn', 'commands.skipped', { reason: 'SKIP_COMMAND_REGISTRATION=true' });
+  } else {
+    await registerGlobalCommands({
+      token: config.DISCORD_TOKEN,
+      clientId: config.DISCORD_CLIENT_ID,
+      commands: COMMAND_DEFINITIONS,
+    });
+  }
+
+  const client = createClient();
+  attachLifecycleLogging(client);
+  attachInteractionHandler(client, buildInteractionRouter(config));
 
   const shutdown = (signal: NodeJS.Signals): void => {
     log('info', 'bot.shutdown', { signal });
-    clearInterval(heartbeat);
-    // M2+: close the better-sqlite3 handle here before exiting.
-    process.exit(0);
+    client
+      .destroy()
+      .catch((err: unknown) => {
+        log('error', 'client.destroy_failed', {
+          err: err instanceof Error ? err.message : String(err),
+        });
+      })
+      .finally(() => {
+        process.exit(0);
+      });
   };
 
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 
+  await client.login(config.DISCORD_TOKEN);
   log('info', 'bot.ready');
 };
 
-try {
-  main();
-} catch (err: unknown) {
+main().catch((err: unknown) => {
   log('error', 'bot.fatal', { err: err instanceof Error ? err.message : String(err) });
   process.exit(1);
-}
+});

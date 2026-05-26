@@ -28,5 +28,9 @@
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.0",
     "vitest": "^4.1.7"
+  },
+  "dependencies": {
+    "discord.js": "^14.26.4",
+    "zod": "^4.4.3"
   }
 }

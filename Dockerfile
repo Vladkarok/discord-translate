@@ -2,18 +2,24 @@
 # Multi-stage build. Final image runs as non-root `node` user (per plan
 # security section).
 
+# Build tools needed in case better-sqlite3 (or any native module) has to
+# compile from source on musl. The runtime stage doesn't keep them.
 FROM node:22-alpine AS deps
 WORKDIR /app
+RUN apk add --no-cache --virtual .build-deps python3 make g++
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev \
+ && apk del .build-deps
 
 FROM node:22-alpine AS build
 WORKDIR /app
+RUN apk add --no-cache --virtual .build-deps python3 make g++
 COPY package.json package-lock.json* ./
 RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build
+RUN npm run build \
+ && apk del .build-deps
 
 FROM node:22-alpine AS runtime
 WORKDIR /app

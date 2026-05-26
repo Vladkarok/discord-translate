@@ -1,22 +1,34 @@
 /**
- * Translate message-context handler — M1 placeholder.
+ * Translate message-context handler — M2 wires access control on top of
+ * the M1 placeholder. Provider call still lands in M3.
  *
- * Critical rule (plan: Interaction Flow §1):
- *   First action MUST be deferReply ephemeral. The 3-second Discord ack
- *   deadline runs even before allowlist/DB/provider work in M2+, so
- *   defer-first is enforced from M1.
- *
- * The character count is reported to verify the interaction payload
- * actually carries the target message (Platform Assumption: "The app
- * receives enough message text from the interaction for translation").
+ * Defer-first rule (plan §Interaction Flow): the first action is always
+ * deferReply ephemeral. Access checks, DB reads, and (M3) provider calls
+ * all happen *after* the 3-second ack deadline is safely satisfied.
  */
 import { MessageFlags, type MessageContextMenuCommandInteraction } from 'discord.js';
+import { denialMessage, resolveAccess } from '../access.js';
+import type { Config } from '../config.js';
+import type { UsersRepository } from '../db/users.js';
 import { log } from '../logger.js';
 
 export const handleTranslate = async (
   interaction: MessageContextMenuCommandInteraction,
+  config: Config,
+  users: UsersRepository,
 ): Promise<void> => {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const access = resolveAccess(interaction.user.id, interaction.context, users, config);
+  if (!access.allowed) {
+    log('warn', 'translate.denied', {
+      userId: interaction.user.id,
+      context: interaction.context,
+      reason: access.reason,
+    });
+    await interaction.editReply({ content: denialMessage(access.reason) });
+    return;
+  }
 
   const target = interaction.targetMessage;
   const charCount = target.content.length;
@@ -24,6 +36,7 @@ export const handleTranslate = async (
   // Privacy: log character count and context metadata, never message body.
   log('info', 'translate.invoked', {
     userId: interaction.user.id,
+    role: access.role,
     targetMessageId: target.id,
     charCount,
     context: interaction.context,
@@ -33,7 +46,7 @@ export const handleTranslate = async (
   await interaction.editReply({
     content: [
       'Translation coming soon.',
-      `(M1 placeholder — payload OK: ${String(charCount)} chars received.)`,
+      `(M2 placeholder — access OK as **${access.role}**, ${String(charCount)} chars received.)`,
     ].join('\n'),
   });
 };

@@ -1,15 +1,17 @@
 /**
- * `/settings show` — owner-only placeholder. M2 will hydrate real
- * values from SQLite.
+ * `/settings show` — owner-only. M2 surfaces real friend count from the
+ * DB; per-user preferences land in M4 (Save target) and beyond.
  */
 import { MessageFlags, type ChatInputCommandInteraction } from 'discord.js';
 import { isOwner } from '../access.js';
 import type { Config } from '../config.js';
+import type { UsersRepository } from '../db/users.js';
 import { log } from '../logger.js';
 
 export const handleSettingsShow = async (
   interaction: ChatInputCommandInteraction,
   config: Config,
+  users: UsersRepository,
 ): Promise<void> => {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -21,11 +23,11 @@ export const handleSettingsShow = async (
 
   await interaction.editReply({
     content: [
-      '**Settings** (M1 placeholder — real values land in M2)',
+      '**Settings**',
       `- default target language: \`${config.DEFAULT_TARGET_LANGUAGE}\``,
       `- DeepL monthly limit: \`${String(config.DEEPL_MONTHLY_CHAR_LIMIT)}\` chars`,
       `- cache stores source text: \`${String(config.CACHE_STORE_SOURCE_TEXT)}\``,
-      `- friends allowlisted: \`0\` (M2)`,
+      `- friends allowlisted: \`${String(users.count())}\``,
     ].join('\n'),
   });
 };

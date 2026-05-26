@@ -1,5 +1,18 @@
 # Single-service Compose stack for v1. See docs/plans/discord-translation-bot.md
 # section "Docker And Deployment".
+#
+# Storage: a named volume (`bot-data`) holds the SQLite file. Named volumes
+# inherit ownership from the image's `/data` (chown'd to `node:node` in the
+# Dockerfile), which avoids the bind-mount UID-mismatch class of bug where
+# the host directory is created as root:root and the non-root container
+# user can't write to it.
+#
+# Backup:
+#   docker run --rm -v discord-translate_bot-data:/data -v "$PWD":/backup \
+#     alpine tar czf /backup/bot-data.tgz -C / data
+# Restore:
+#   docker run --rm -v discord-translate_bot-data:/data -v "$PWD":/backup \
+#     alpine sh -c "cd / && tar xzf /backup/bot-data.tgz"
 services:
   bot:
     build: .
@@ -7,4 +20,7 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - ./data:/data
+      - bot-data:/data
+
+volumes:
+  bot-data:

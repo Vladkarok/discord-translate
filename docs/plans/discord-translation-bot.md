@@ -17,7 +17,9 @@ in v1.** A `TranslationProvider` interface is in place so a Google Cloud
 Translation adapter can be added later without refactor; Google is deferred
 indefinitely because for the 3-user audience DeepL Free (500K char/month) will
 not be exhausted, and Google adds GCP project + billing + JSON-credential
-complexity with a free-tier sunset after 12 months. Paid overflow is disabled.
+complexity. (Note: Google's ~500K NMT chars/month is covered by a recurring
+monthly credit, not a 12-month trial — the deferral is about setup overhead,
+not free-tier expiry.) Paid overflow is disabled.
 
 ## User Requirements
 
@@ -50,9 +52,13 @@ complexity with a free-tier sunset after 12 months. Paid overflow is disabled.
 - No self-hosted translation model.
 - No paid translation usage.
 - No OCR or image translation.
+- No document translation or arbitrary attachment translation.
+- No file-attachment delivery of long translation output (privacy/CDN
+  concern — Discord CDN URLs are publicly reachable).
 - No web dashboard.
 - No multi-tenant billing.
 - No public bot listing.
+- No per-channel or per-server policy matrix.
 - No complex user registration outside Discord.
 - No automatic server-wide availability for friends unless explicitly enabled.
 
@@ -67,6 +73,12 @@ Before implementation, verify these in a throwaway Discord app:
 - `interaction.locale` is populated for the invoking user and is stable enough
   to use as a default target hint.
 - Message command registration works for the chosen install contexts.
+- The global `Translate` command can be registered with `integration_types`
+  including `USER_INSTALL` and `contexts` including `PRIVATE_CHANNEL`.
+- `interaction.context` and `authorizing_integration_owners` are populated
+  enough to distinguish user-installed DM/group-DM use from guild use.
+- Component interactions preserve enough state to enforce "only the original
+  invoking user can press these controls."
 
 Relevant documentation:
 
@@ -94,6 +106,7 @@ discord-translate/
     providers/
     services/
     db/
+    text/
   data/
     bot.sqlite
   Dockerfile
@@ -114,6 +127,19 @@ The app should be structured so the Discord layer does not know provider
 details. All translation calls go through a provider interface and a
 translation service.
 
+Decision comment:
+
+- One process is enough because there are only three expected users and no
+  independent scaling boundary. A separate API service, queue, worker, or
+  Redis layer would add deployment/debugging cost without improving the core
+  UX.
+- Keep provider details out of the Discord handlers because provider choice is
+  the most likely future change. The handler should know "translate this",
+  not "call DeepL this way".
+- Keep SQLite in a Docker volume because this is user/settings/quota state, not
+  collaborative business data. PostgreSQL can be added later if concurrency or
+  reporting needs become real.
+
 ## Technology Choices
 
 ### Language And Framework
@@ -126,6 +152,18 @@ Reasoning:
 - Good fit for message context menu commands, buttons, selects, and modals.
 - Easier Discord API ergonomics than mixing a Python bot with Node examples.
 - Translation providers are simple HTTP/API clients, so TypeScript is enough.
+
+Decision comment:
+
+- Prefer `discord.js` over Python for v1 because Discord interaction UX is the
+  hard part, and the Node/TypeScript ecosystem is strong for application
+  commands and components.
+- Do not choose Python just for possible future local ML. Local translation is
+  explicitly not v1, and optimizing for that now would make the first useful
+  bot slower to ship.
+- Do not use a lower-level Discord REST/webhook-only implementation unless VPS
+  operations become a problem. The gateway client is simpler for an always-on
+  personal bot.
 
 ### Database
 
@@ -143,6 +181,16 @@ statements idempotently on boot. No ORM — 4 tables and zero expected schema
 churn make Drizzle/Prisma dead weight at this scale. If the schema ever grows
 past ~10 tables or migration history becomes non-trivial, revisit.
 
+Decision comment:
+
+- Prefer `better-sqlite3` over an async SQLite wrapper because the bot is
+  single-process and quota/settings writes are tiny. The synchronous API keeps
+  quota code easier to reason about.
+- Prefer hand-written SQL over an ORM because the schema is small and the
+  important behavior is atomic SQL, not object mapping.
+- Prefer startup `CREATE TABLE IF NOT EXISTS` over a migration framework until
+  there is real schema history to preserve.
+
 ### Translation Providers
 
 v1 implements DeepL only. The `TranslationProvider` interface allows a Google
@@ -154,14 +202,31 @@ flow is simple (no GCP project/billing setup).
 
 Google deferral notes (for the future adapter, when/if added):
 
-- Google Cloud Translation free tier is 500K char/month for the first 12
-  months on a new GCP project. After that, paid by default — so the local
-  hard-stop guard and `ALLOW_PAID_OVERFLOW=false` become the only protection.
+- Google Cloud Translation NMT is priced at $20 per million characters,
+  offset by a recurring monthly credit that covers ~500K chars/month (not
+  a 12-month trial — the credit is perpetual on standard pricing as of
+  this writing). The local hard-stop guard and `ALLOW_PAID_OVERFLOW=false`
+  remain the authoritative protection against overage.
 - Requires GCP project, billing-enabled account, service-account JSON
   credentials, and `GOOGLE_APPLICATION_CREDENTIALS` env wiring.
 
 Paid overflow is disabled. Provider calls must be blocked locally before
 exceeding configured monthly limits.
+
+Decision comment:
+
+- Prefer DeepL over Google for v1 because setup is simpler and the required
+  language set is small: English, French, Ukrainian. Google is useful later
+  only if DeepL coverage or quality is insufficient in real use.
+- Do not add Google as a "just in case" fallback in v1. It adds GCP project,
+  billing, service-account secrets, and a second quota model before the core
+  Discord UX is proven.
+- Do not use OpenAI or a general LLM as the default translator. Dedicated MT is
+  the safer default for predictable translation, quota accounting, and latency.
+  A future LLM mode should be framed as tone/rewrite help, not the base engine.
+- Do not self-host MT in v1. It improves incremental privacy after Discord but
+  introduces model selection, CPU latency, language detection, updates, and
+  quality tradeoffs that do not serve the first production goal.
 
 ## Discord App Model
 
@@ -175,6 +240,16 @@ Use Discord's native user-install flow:
 4. Friend can use `Apps -> Translate` if they are allowlisted.
 
 There is no custom registration flow.
+
+Decision comment:
+
+- Prefer Discord's native user-install flow over custom onboarding because the
+  users are already Discord users and the audience is tiny.
+- Keep allowlisting inside the bot instead of relying only on Discord install
+  permissions. Installing the app is not the same as being allowed to spend the
+  shared translation quota.
+- Do not build a web dashboard or login flow for v1. Owner-only slash commands
+  are enough for three users.
 
 ### Commands
 
@@ -210,6 +285,16 @@ Consider later:
 - `/access server allow-server <server>`
 - `/access server deny-server <server>`
 
+Decision comment:
+
+- Use a message context command for translation because the selected message is
+  the input. A slash command would force users to copy/paste text and would be
+  worse on mobile.
+- Keep slash commands for settings/admin operations because they do not target a
+  specific message.
+- Keep server access coarse in v1. Per-server or per-channel policy is a real
+  feature only after server usage becomes common.
+
 ### Interaction Flow
 
 On `Translate`:
@@ -219,14 +304,35 @@ On `Translate`:
    before any DB read or provider call. Easy to violate under refactor.
 2. Validate invoking user is allowed.
 3. Validate current context:
+   - Prefer Discord's explicit `interaction.context` and
+     `authorizing_integration_owners` metadata over heuristics like "guild ID
+     present".
    - Owner: allowed in DMs and configured servers.
    - Friend: DMs only by default.
    - Friend in server: only if owner enabled server usage for that friend.
-4. Extract message text.
+4. Extract message text and protect non-translatable spans.
 5. Reject empty/non-text messages with a private explanation.
 6. Resolve target language.
 7. Translate with provider service.
-8. Send or edit ephemeral response with result and controls.
+8. Edit the original ephemeral response with result and controls.
+
+Interaction response rule:
+
+- Defer once immediately, then edit the original ephemeral response.
+- Re-render the same original response for source/target overrides whenever
+  practical.
+- Avoid follow-up messages as the normal path. User-installed apps have a
+  small follow-up budget, and follow-ups make the UX noisier than editing the
+  current translation panel.
+
+Decision comment:
+
+- Defer immediately because provider calls, database reads, and cold network
+  paths are all slower than Discord's interaction acknowledgement deadline.
+- Edit the original ephemeral response because it keeps source/target override
+  state in one place and avoids exhausting the follow-up message budget.
+- Do not reply publicly in channels. Translation is often private, especially
+  in DMs and small conversations.
 
 **Discord gateway intents:** none privileged. Message context commands
 deliver the target message in the interaction payload. Do **not** enable
@@ -252,6 +358,90 @@ If detection is weak or missing:
 2. Reply ephemerally with original text and source-language selection.
 3. After user selects source, translate.
 
+### Interactive State Storage
+
+Component interactions (Source/Target/Swap/Save target) cannot rebuild the
+original translation context from Discord alone:
+
+- `custom_id` is capped at 100 chars — too small for protected source text
+  or any meaningful payload beyond an opaque session ID.
+- On a component interaction, `interaction.message` is the bot's ephemeral
+  response, not the original target message; re-fetching the target by ID
+  may not be possible from a user-installed app's permission scope.
+- The persistent `translation_cache` is hash-only by default and intentionally
+  cannot reconstruct source text.
+
+Solution: a short-lived **in-memory** session store keyed by an opaque
+`sessionId` embedded in component `custom_id`s.
+
+```ts
+interface TranslationSession {
+  userId: string;                  // bind to original invoking user
+  protectedSource: string;         // post-placeholder-replacement text
+  detectedSource: string | null;
+  currentSource: string;           // 'auto' or language code
+  currentTarget: string;
+  expiresAt: number;               // epoch ms; TTL 15–30 min
+}
+// Map<string, TranslationSession> with a periodic sweep.
+```
+
+Why in-memory rather than a `translation_sessions` SQLite table:
+
+- Single-process bot, 3 users — concurrency is trivial; no cross-process
+  coordination is needed.
+- Failure mode of a container restart mid-conversation is acceptable: the
+  user re-invokes `Translate`. If the same text+target was already
+  translated, the persistent hash-only cache makes the re-invocation
+  effectively free.
+- Keeps the no-source-text-on-disk discipline intact. Transient UI state
+  is not persistent translation history; this is the distinction that
+  matters.
+
+Promote to a SQLite `translation_sessions` table (same schema, plus a TTL
+sweep) **only** if observation shows users routinely losing in-flight
+controls across restarts. Until then, in-memory is the right answer.
+
+### Message Text And Formatting Protection
+
+V1 translates selected message text. It does not translate attachments,
+images, files, or OCR output.
+
+Before sending text to a provider, split the message into translatable spans
+and protected spans. Preserve these spans without translation:
+
+- fenced code blocks
+- inline code
+- URLs
+- raw Discord mentions (`<@...>`, `<#...>`, `<@&...>`)
+- custom emoji tokens (`<:name:id>`, `<a:name:id>`)
+- attachment URLs
+
+Implementation shape:
+
+1. Parse message content into spans.
+2. Replace protected spans with stable placeholders.
+3. Translate the protected text.
+4. Verify every placeholder survived exactly once in the provider response.
+5. Rehydrate placeholders into the translated result.
+6. Render with `allowed_mentions: { parse: [] }` so translated output cannot
+   ping users or roles.
+
+If placeholder verification fails, do not render corrupted Discord syntax.
+Return a private error or a conservative fallback rendering that keeps
+protected spans out of the translated body.
+
+Text-bearing embeds are not required for the first useful slice. They are a
+reasonable V1.x/V2 addition after the plain message path is stable.
+
+Decision comment:
+
+- Protect code, URLs, mentions, and emoji before translation because providers
+  are optimized for language, not Discord syntax. This also prevents accidental
+  pings in translated output.
+- Do not support attachments or OCR in v1. Those change privacy, billing,
+  latency, and UI complexity enough to deserve a separate feature pass.
+
 ### Ephemeral Message Format
 
 Default result:
@@ -274,9 +464,16 @@ For long messages:
 - Include a note such as `Original trimmed for display`.
 - Avoid leaking text into logs.
 
-Discord message component limits should be handled explicitly. If the result is
-too long for one message, split safely or use a compact response with a follow-up
-ephemeral message.
+Discord message and component limits must be handled explicitly before the
+provider call is wired into the final interaction. Bot message `content` is
+capped at 2000 chars; embed `description` at 4096; total embed payload at
+6000. Design the renderer around content=2000 and move the translation body
+into an embed when it exceeds that. If even the embed cap is exceeded, emit
+a compact response that contains the full translation and notes that the
+original-text echo was trimmed. **Do not** use a file attachment to deliver
+long translations in v1 — attachments change the privacy/retention story
+(Discord CDN caches them with publicly reachable URLs). Do not spend the
+limited follow-up message budget on length overflow.
 
 ## Access Control
 
@@ -300,6 +497,16 @@ auditor besides the owner, so the "auditability" rationale doesn't apply at
 v1 scale.
 
 The allowlist is not a user registration system. It is quota protection.
+
+Decision comment:
+
+- Use Discord user IDs as the access key because they are stable enough for
+  this private bot and already present in interactions.
+- Keep owner identity in `OWNER_DISCORD_ID` because there is one owner and no
+  independent auditor. Storing owner as a database row would create a second
+  source of truth.
+- Use a single `server_usage_enabled` boolean because v1 only needs "can this
+  friend use servers at all?" Finer policy should wait for real server use.
 
 ## Quota And Cost Control
 
@@ -330,7 +537,9 @@ Before any provider call:
        AND characters_used + :n <= :limit;
    ```
    If 0 rows are affected, the call would overshoot — reject. Otherwise
-   the call is "reserved" and may proceed. On provider failure, decrement.
+   the call is "reserved" and may proceed. Refund rules are asymmetric;
+   see "Reservation refund rules" below — do not blindly decrement on
+   every failure.
 3. Return an ephemeral quota message on reject.
 
 After successful provider call:
@@ -338,21 +547,69 @@ After successful provider call:
 1. Store provider, detected source, target, and character count.
 2. (Usage already incremented atomically above.)
 
-**Per-user daily cap.** In addition to the per-provider monthly cap, each
-allowlisted user has a `daily_char_budget` (default e.g. 50K chars/day).
-One friend pasting a long document cannot torch the shared monthly budget.
+**No default daily cap.** For a 3-person bot, usage can be bursty: one active
+day may involve a lot of translation, while another day may involve almost
+none. A fixed per-user daily cap is likely to block legitimate use on the
+active day and add little protection on quiet days. The provider monthly quota
+is the actual hard stop for v1.
+
+Optional future throttle:
+
+- If real abuse/noise appears, add a per-user daily or rolling-window cap as a
+  V1.x feature.
+- Keep it disabled by default and configurable per user.
+- If added, reserve provider monthly quota and per-user throttle in one
+  `db.transaction(...)` so they succeed or fail together.
+
+```ts
+const reserveProviderQuota = db.transaction((p, month, n) => {
+  const a = stmtProviderUpdate.run({ p, month, n /*, limit */ });
+  if (a.changes === 0) throw new QuotaExceeded("provider");
+});
+```
+
+The transaction wrapper is still useful even with one UPDATE because it keeps
+the implementation ready for future quota tables and gives one place for
+reservation/refund logic.
+
+**Reservation refund rules (asymmetric).** DeepL may have already metered
+characters on some failures. Refund the reservation **only** when we know the
+call did not bill:
+
+- **Refund safe:** local validation rejection before HTTP send; unsupported
+  language detected before send; authentication/config error (401/403)
+  before translation; explicit 4xx where the response indicates the request
+  was rejected unprocessed.
+- **Keep the reservation:** network timeout after send; 5xx response; any
+  post-send error where DeepL's billing state is ambiguous. Accept small
+  upward drift in favor of fail-closed behavior.
+- **Manual reconciliation:** a future `/quota status` extension or a small
+  periodic job can compare local accounting with the DeepL dashboard. In
+  v1 the dashboard is the source of truth for billing; local accounting
+  is only the hard local stop.
 
 Configuration:
 
 ```text
 DEEPL_MONTHLY_CHAR_LIMIT=500000
-GOOGLE_MONTHLY_CHAR_LIMIT=500000
 ALLOW_PAID_OVERFLOW=false
 ```
 
 The exact provider account-side quota should still be configured in the vendor
 console when possible. Local quota tracking is a safety guard, not a replacement
 for provider billing limits.
+
+Decision comment:
+
+- Reserve quota before provider calls because the bot must fail closed before
+  paid usage, not after the vendor has already billed characters.
+- Use atomic SQL instead of check-then-increment code because concurrent
+  interactions can otherwise overshoot the local cap.
+- Do not enable a per-user daily cap by default because active conversation is
+  naturally bursty. The monthly provider cap is the hard stop; per-user
+  throttles can be added later if real abuse appears.
+- Still configure provider-side limits because local accounting can drift if
+  calls happen outside the bot or the provider's billing semantics change.
 
 ## Translation Service Design
 
@@ -363,6 +620,8 @@ export interface TranslateInput {
   text: string;
   sourceLanguage?: string;
   targetLanguage: string;
+  context?: string;
+  qualityPreference?: "latency" | "quality";
 }
 
 export interface TranslateResult {
@@ -387,17 +646,35 @@ export interface TranslationProvider {
 Translation orchestration (v1 — single provider):
 
 1. Normalize language codes from Discord/provider/UI into internal codes.
-2. Check cache.
-3. Atomic quota check-and-increment for the (only) provider.
-4. Call provider.
-5. On provider failure, decrement the quota reservation and surface a
-   private error.
-6. Store result.
-7. Return result to interaction renderer.
+2. Protect non-translatable spans and derive the normalized cache input.
+3. Check cache.
+4. Atomic quota check-and-increment for the (only) provider.
+5. Call provider.
+6. On provider failure, apply reservation refund rules; refund only when the
+   request is definitely unbilled.
+7. Rehydrate protected spans.
+8. Store result.
+9. Return result to interaction renderer.
 
 The orchestrator does not yet implement fallback because there is only one
 provider. The interface allows fallback to be added later without changing
 adapters.
+
+Decision comment:
+
+- Keep the provider interface now because it is cheap and protects the Discord
+  layer from provider-specific APIs.
+- Do not implement fallback orchestration until there is a second real
+  provider. Fallback code without a real adapter is untested branching.
+- Keep `supports()` synchronous so provider routing cannot introduce network
+  calls before quota checks or interaction acknowledgement.
+
+DeepL-specific v1 note:
+
+- DeepL's `context` parameter is useful for short ambiguous chat messages and
+  is not billed as translated text. Do not depend on fetching previous Discord
+  messages for v1. If safe context is already available from the interaction
+  or a later verified flow, pass it through `TranslateInput.context`.
 
 Provider failures should be classified:
 
@@ -408,9 +685,9 @@ Provider failures should be classified:
 - provider error
 - unknown error
 
-Only safe fallback failures should try the next provider. Authentication errors
-should surface to owner logs and not silently burn fallback quota unless the
-failure is specific to provider availability.
+Future fallback rule: only safe fallback failures should try the next provider.
+Authentication errors should surface to owner logs and not silently burn
+fallback quota unless the failure is specific to provider availability.
 
 ## Language Handling
 
@@ -435,11 +712,32 @@ The registry should include provider-specific mapping:
 Start with English, French, Ukrainian as pinned common languages. Add a
 provider-backed list later for broader support.
 
+DeepL adapter mapping:
+
+- Internal codes stay lowercase (`en`, `fr`, `uk`, `auto`).
+- For auto-detection, omit DeepL `source_lang`; DeepL requires
+  `target_lang`.
+- Manual source mapping:
+  - `en` -> `EN`
+  - `fr` -> `FR`
+  - `uk` -> `UK`
+- Target mapping:
+  - `en` -> `EN-US` by default
+  - `fr` -> `FR`
+  - `uk` -> `UK`
+- `DEFAULT_ENGLISH_VARIANT` may switch the target mapping to `EN-GB` if the
+  owner prefers British English. Avoid generic DeepL target `EN` unless there
+  is a specific compatibility reason; DeepL recommends choosing a regional
+  English target variant.
+- Do not use regional variants as `source_lang`; DeepL variants are target
+  language choices.
+
 Target fallback:
 
 1. saved user setting
 2. Discord locale:
-   - `en-*` -> English
+   - `en-US` -> English (`EN-US`)
+   - other `en-*` -> English (`DEFAULT_ENGLISH_VARIANT`)
    - `fr` -> French
    - `uk` -> Ukrainian
 3. English
@@ -447,6 +745,10 @@ Target fallback:
 If source and target resolve to the same language, still allow the user to
 override. The app can return a private prompt like: `Source and target both look
 like English. Choose another target?`
+
+DeepL billing note: same-language translation requests still count toward
+billing, so avoid sending known same-language source/target pairs unless the
+user explicitly confirms or changes one side.
 
 ## Caching
 
@@ -482,6 +784,16 @@ Privacy note:
   text storage for debugging, but it stays off in production.
 - Avoid storing Discord message author names and unnecessary metadata.
 
+Decision comment:
+
+- Cache translated output because repeated chat phrases are common and cache
+  hits reduce cost and latency.
+- Do not store raw source text by default because Discord messages may be
+  private. A source hash is enough to find repeat translations without turning
+  SQLite into a DM archive.
+- Use a global cache by default unless abuse appears. For the same normalized
+  text/source/target/provider tuple, the result is not user-specific in v1.
+
 ## Configuration
 
 `.env.example` should include:
@@ -495,10 +807,7 @@ OWNER_DISCORD_ID=
 DEEPL_API_KEY=
 DEEPL_API_URL=https://api-free.deepl.com
 DEEPL_MONTHLY_CHAR_LIMIT=500000
-
-# Per-user daily character cap (quota protection against a single user
-# burning the shared monthly budget):
-DEFAULT_USER_DAILY_CHAR_LIMIT=50000
+DEFAULT_ENGLISH_VARIANT=en-US
 
 # Cache behaviour:
 CACHE_STORE_SOURCE_TEXT=false   # default: hash-only privacy mode
@@ -552,6 +861,16 @@ The bot should handle SIGTERM cleanly and close the database.
 The Dockerfile must use the official Node image and switch to the
 non-root `node` user after `npm install`/build.
 
+Decision comment:
+
+- Prefer Docker Compose on the existing VPS because it matches the deployment
+  environment and keeps persistence simple.
+- Do not use serverless HTTP interactions for v1. They are viable, but they
+  add signature verification, statelessness, cold starts, and different
+  operational failure modes for no clear benefit at three users.
+- Do not push an image registry into the first deployment unless VPS builds are
+  actually painful. Building locally on the VPS is sufficient at this scale.
+
 ## Logging And Privacy
 
 Logs should include:
@@ -591,8 +910,9 @@ Owner-facing logs should include enough detail to fix config/provider issues.
 
 For provider outages:
 
-- Try fallback provider if quota and language support allow it.
-- If both fail, return a concise private error.
+- v1 has no fallback provider. Return a concise private error.
+- If a future V2 fallback provider exists, try it only when quota and language
+  support allow it.
 - Do not retry repeatedly inside one interaction in a way that causes long
   waits or duplicate billing.
 
@@ -617,16 +937,8 @@ users
   role text not null -- owner | friend
   target_language text null
   server_usage_enabled integer not null default 0
-  daily_char_budget integer not null default 50000
   created_at text not null
   updated_at text not null
-
-user_daily_usage
-  discord_user_id text not null
-  usage_date text not null  -- YYYY-MM-DD
-  characters_used integer not null default 0
-  updated_at text not null
-  primary key (discord_user_id, usage_date)
 
 provider_usage
   provider text not null
@@ -642,14 +954,13 @@ translation_cache
   source_language text null
   target_language text not null
   source_hash text not null
+  source_text text null -- populated only when CACHE_STORE_SOURCE_TEXT=true
   translated_text text not null
   created_at text not null
 ```
 
-v1 defaults to hash-only caching (no `source_text` column). If
-`CACHE_STORE_SOURCE_TEXT=true` is set, an optional `source_text` column is
-populated; otherwise it stays null/absent. The migrator handles both
-shapes idempotently.
+v1 defaults to hash-only caching. `source_text` exists only to keep the schema
+simple; it stays null unless `CACHE_STORE_SOURCE_TEXT=true` is set.
 
 Notes vs. earlier draft:
 
@@ -663,6 +974,69 @@ Notes vs. earlier draft:
 - `provider_usage.monthly_limit` is denormalized into the row so the
   atomic check-and-increment query is self-contained (no env lookup
   inside SQL).
+
+## Post-V1 Evolution
+
+V1 is a stable personal bot, not a disposable prototype. "V2" should mean
+"new capability class after V1 is useful in daily conversation", not automatic
+scope expansion. If V1 solves the real need, V2 can stay unbuilt.
+
+Decision comment:
+
+- The label "v1" exists to keep the first release disciplined, not to promise a
+  larger product. Future work should be pulled by observed usage.
+- V1.x is for low-risk polish that preserves the architecture. V2 is for new
+  capability classes: new providers, local MT, documents/OCR, or richer access
+  policy.
+
+### V1 Definition
+
+V1 is complete when:
+
+- owner + allowlisted friends can use `Apps -> Translate` in DMs/group DMs
+- the app uses DeepL only, with hard local quota stops
+- text messages translate between English, French, and Ukrainian
+- source/target overrides and saved default target language work
+- logs avoid message content by default
+- hash-only cache, quota status, and long-message handling are in place
+- the bot runs on the VPS with persistent SQLite storage
+
+### V1.x Polish Candidates
+
+Small additions that should not change the architecture:
+
+- text-bearing embed translation after plain message translation is stable
+- optional small `.txt` / `.md` attachment translation with explicit consent
+- DeepL context for short messages if context can be obtained without broader
+  Discord permissions or extra privacy exposure
+- optional per-user daily or rolling-window throttle if real abuse/noise
+  appears; disabled by default
+- provider-side usage polling to compare local quota accounting with DeepL
+- backup/restore notes for the SQLite volume
+
+### V2 Candidates
+
+Only promote these when a real need appears:
+
+- **Provider expansion:** Google Cloud Translation NMT as a fallback if DeepL
+  lacks coverage or quality for a language pair actually used. Google remains
+  optional because it adds GCP project, billing, and credential complexity.
+- **Quality modes:** an optional "rewrite/tone" path using an LLM for cases
+  where preserving social tone or formatting matters more than deterministic
+  machine translation. This is not the default translator.
+- **Local privacy backend:** optional self-hosted MT, likely M2M100/NLLB via
+  CTranslate2, for conversations where avoiding an extra cloud provider matters
+  more than quality/latency simplicity. Keep it as a separate backend, not a
+  rewrite of the Discord bot.
+- **Richer content:** document translation, OCR, and larger attachment flows.
+  These require explicit consent and separate privacy/billing treatment.
+- **Richer access model:** per-server or per-channel policy tables only if the
+  single `server_usage_enabled` boolean becomes inadequate in real use.
+- **Broader operations:** health command, backup automation, key rotation
+  runbook, dependency update cadence, and provider-side quota reconciliation.
+
+Explicit V2 non-goal unless the product changes: public bot listing,
+multi-tenant billing, or broad server moderation features.
 
 ## Implementation Milestones
 
@@ -686,16 +1060,24 @@ Acceptance:
 
 - Add Discord client startup.
 - Register message context command `Translate`.
+  - Global command uses user-install support and `PRIVATE_CHANNEL` context
+    for the first verification path.
+  - Guild/server context can be present in code only after the DM path is
+    verified.
 - Add simple ephemeral response: `Translation coming soon`.
 - Add owner-only `/settings show`.
 - Add command registration script.
+- Use immediate defer + edit-original response path, even for the placeholder.
 
 Acceptance:
 
 - App installs through Discord.
 - `Apps -> Translate` appears in DM.
+- Registration payload uses the intended `integration_types` and `contexts`.
 - Bot replies ephemerally.
 - Unauthorized user receives private denial.
+- The handler records/verifies `interaction.context` and
+  `authorizing_integration_owners` during manual testing.
 
 ### Milestone 2 - Database And Access Control
 
@@ -717,8 +1099,9 @@ Acceptance:
 
 - Add DeepL adapter.
 - Add language mapping for English, French, Ukrainian.
+- Add message formatting protection for code spans, URLs, mentions, emoji
+  tokens, and attachment URLs.
 - Implement atomic provider quota check-and-increment.
-- Implement per-user daily char cap check.
 - Implement text translation with auto-detect.
 - Render source/target/provider in ephemeral response.
 
@@ -728,8 +1111,9 @@ Acceptance:
 - French -> English works.
 - English -> French works.
 - Local provider quota increments atomically.
-- Per-user daily cap blocks runaway usage.
 - Calls stop before configured quota.
+- Mentions/code/URLs are preserved and never accidentally ping.
+- Placeholder corruption is detected before rendering translated output.
 
 ### Milestone 4 - Interactive Source/Target Controls
 
@@ -752,6 +1136,8 @@ Acceptance:
 - Add message length limits.
 - Add long-response handling.
 - Add structured logs without message content.
+- Keep the normal interaction loop on edit-original response, not follow-up
+  message chains.
 
 Acceptance:
 
@@ -765,7 +1151,8 @@ Acceptance:
 - Deploy with Docker Compose.
 - Configure restart policy and persistent volume.
 - Document Discord Developer Portal setup.
-- Document DeepL and Google setup.
+- Document DeepL setup, provider-side usage limits, and notes for future
+  Google setup if V2 needs it.
 - Run owner/friend DM tests.
 
 Acceptance:
@@ -782,28 +1169,35 @@ Unit tests:
 - language code mapping
 - locale to target-language resolution
 - access-control decisions
+- Discord install/context interpretation from `interaction.context` and
+  `authorizing_integration_owners`
+- formatting protection and placeholder rehydration
 - atomic quota check-and-increment (including concurrent-call race)
-- per-user daily cap logic
 - cache key generation
+- long-message rendering decisions
 - provider failure classification
 
 Integration tests with mocked DeepL adapter:
 
 - message context translation flow
+- immediate defer + edit-original flow
 - source override
 - target override
-- quota exceeded behavior (provider monthly and per-user daily)
+- foreign-user component rejection
+- quota exceeded behavior (provider monthly)
 - cache hit behavior
+- rate-limit/provider failure behavior
 
 Manual Discord tests:
 
 - desktop DM
 - mobile DM
-- group DM if desired
+- group DM
 - server denied by default
 - server allowed after owner command
 - friend install flow
 - unauthorized install attempt
+- someone else attempts to use another user's controls
 
 Provider smoke tests:
 
@@ -815,10 +1209,15 @@ Provider smoke tests:
 
 - Should cache be global across all users or per-user? (Likely global —
   same source text translates the same regardless of who asks.)
-- What exact maximum message length should v1 allow? (Discord caps message
-  content at 4000 chars; ephemeral response body at 2000. Need to truncate
-  the original-text echo, not the translation.)
+- What exact maximum message length should v1 allow? Discord bot message
+  `content` is capped at 2000 chars (the 4000-char limit applies to Nitro
+  client composition, not the bot API). Embed `description` is 4096 chars;
+  total embed payload is 6000. Design the renderer around content=2000 with
+  the embed as the long-form path. Truncate the original-text echo, not the
+  translation.
 - Should group DMs be treated as DMs or disabled until tested?
+- Should DeepL context be enabled at all in v1, given that fetching surrounding
+  Discord messages may broaden permissions/privacy exposure? Default: no.
 
 Resolved during v1 planning (see DECISIONS.md):
 
@@ -827,6 +1226,8 @@ Resolved during v1 planning (see DECISIONS.md):
 - ~~Google Cloud Translation in v1~~ → deferred indefinitely; DeepL only.
 - ~~Drizzle vs. better-sqlite3~~ → `better-sqlite3` + tiny startup migrator.
 - ~~Runtime provider order config~~ → moot, single provider in v1.
+- ~~Per-user daily char cap by default~~ → disabled/omitted in v1; usage is
+  bursty, so provider monthly quota is the hard stop.
 
 ## Self-Review
 
@@ -876,6 +1277,11 @@ Resolved during v1 planning (see DECISIONS.md):
 - Prefer source-text hashing in cache by default.
 - Add explicit long-message rendering rules before provider calls are wired into
   the final interaction.
+- Use edit-original response as the normal interaction update path; avoid
+  follow-up chains.
+- Add formatting protection before provider calls can ship.
+- Treat V2 as optional evolution after V1 proves daily value, not as automatic
+  scope expansion.
 
 ## Recommended First Build Slice
 

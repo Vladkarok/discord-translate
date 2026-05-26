@@ -1,0 +1,10 @@
+# Single-service Compose stack for v1. See docs/plans/discord-translation-bot.md
+# section "Docker And Deployment".
+services:
+  bot:
+    build: .
+    image: discord-translate:dev
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data

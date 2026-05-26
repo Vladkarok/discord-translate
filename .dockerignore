@@ -1,0 +1,17 @@
+node_modules
+dist
+coverage
+data
+.env
+.env.*
+!.env.example
+.git
+.github
+.claude
+.codex
+docs
+*.md
+!README.md
+.vscode
+.idea
+*.log

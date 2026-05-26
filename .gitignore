@@ -14,3 +14,25 @@ docs/agent/LOCAL.md
 
 # Optional Claude local settings:
 # .claude/settings.local.json
+
+# --- Node / TypeScript ---
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# --- Runtime data / secrets ---
+.env
+.env.local
+.env.*.local
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
+
+# --- Logs / OS ---
+*.log
+.DS_Store
+.vscode/
+.idea/

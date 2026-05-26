@@ -31,3 +31,10 @@ Entry format:
 - Refined v1 plan for 3-user personal scale: DeepL-only (Google deferred), better-sqlite3 (no ORM), hash-only cache default, atomic quota check-and-increment, per-user daily cap, dropped allowed_servers table, dropped owner-in-DB, dropped MessageContent intent, container runs non-root.
 - Created multi-session task file `docs/agent/tasks/discord-translation-bot.md` (Active: yes) mirroring revised milestones M0-M6 as checkboxes.
 - see: docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
+
+## 2026-05-26 17:47 codex plan-rationale
+
+- Folded useful deep-research findings into the canonical implementation plan and added rationale comments for major decisions.
+- Reversed default per-user daily cap: v1 now uses provider monthly quota as the hard stop; optional per-user throttle is deferred until real abuse/noise appears.
+- Added DeepL mapping, placeholder integrity, refund-only-when-definitely-unbilled quota semantics, and V1/V2 evolution boundaries.
+- see: docs/agent/sessions/2026-05-26-174746-codex-plan-rationale.md

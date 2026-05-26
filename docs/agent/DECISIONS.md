@@ -39,3 +39,4 @@ Read on demand (look up "when did we decide X?"), not loaded on every
 2026-05-25 · Owner identity from OWNER_DISCORD_ID env only; not stored as DB row · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
 2026-05-25 · Discord MessageContent intent stays disabled; message context commands deliver target message in the interaction payload · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
 2026-05-25 · Container runs as non-root via Node official image's USER node · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
+2026-05-26 · Reverse 2026-05-25 per-user daily cap decision — v1 uses provider monthly hard stop; optional per-user throttle only if real abuse appears · docs/agent/sessions/2026-05-26-174746-codex-plan-rationale.md

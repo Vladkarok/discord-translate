@@ -16,7 +16,7 @@
 services:
   bot:
     build: .
-    image: discord-translate:dev
+    image: ghcr.io/vladkarok/discord-translate:${IMAGE_TAG:-dev}
     restart: unless-stopped
     env_file: .env
     volumes:

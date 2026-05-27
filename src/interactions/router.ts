@@ -1,6 +1,5 @@
 /**
- * Single InteractionCreate dispatcher. Adding M4's component handlers
- * later is one more `else if` branch.
+ * Single InteractionCreate dispatcher.
  *
  * Recovery rule: if a handler throws after deferReply, we still try to
  * surface a private error so the user does not stare at a spinning
@@ -8,8 +7,10 @@
  */
 import { MessageFlags, type Interaction } from 'discord.js';
 import type { Config } from '../config.js';
+import type { OwnerPrefsRepository } from '../db/owner-prefs.js';
 import type { UsersRepository } from '../db/users.js';
 import type { TranslateService } from '../services/translate.js';
+import type { SessionStore } from '../sessions/store.js';
 import { log } from '../logger.js';
 import {
   ACCESS_COMMAND_NAME,
@@ -21,11 +22,14 @@ import { handleAccess } from './access.js';
 import { handleFriends } from './friends.js';
 import { handleSettingsShow } from './settings.js';
 import { handleTranslate } from './translate.js';
+import { handleTranslatePanel } from './translate-panel.js';
 
 export interface RouterDeps {
   readonly config: Config;
   readonly users: UsersRepository;
+  readonly ownerPrefs: OwnerPrefsRepository;
   readonly translateService: TranslateService;
+  readonly sessions: SessionStore;
 }
 
 export const buildInteractionRouter =
@@ -36,7 +40,7 @@ export const buildInteractionRouter =
         interaction.isMessageContextMenuCommand() &&
         interaction.commandName === TRANSLATE_COMMAND_NAME
       ) {
-        await handleTranslate(interaction, deps.config, deps.users, deps.translateService);
+        await handleTranslate(interaction, deps);
         return;
       }
 
@@ -51,6 +55,13 @@ export const buildInteractionRouter =
           case ACCESS_COMMAND_NAME:
             await handleAccess(interaction, deps.config, deps.users);
             return;
+        }
+      }
+
+      if (interaction.isMessageComponent()) {
+        if (interaction.customId.startsWith('dt:')) {
+          await handleTranslatePanel(interaction, deps);
+          return;
         }
       }
 

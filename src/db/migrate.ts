@@ -42,9 +42,17 @@ CREATE TABLE IF NOT EXISTS translation_cache (
 
 CREATE INDEX IF NOT EXISTS idx_translation_cache_created_at
   ON translation_cache (created_at);
+
+CREATE TABLE IF NOT EXISTS owner_prefs (
+  id              INTEGER PRIMARY KEY CHECK (id = 1),
+  target_language TEXT,
+  updated_at      TEXT NOT NULL
+);
 `;
 
 export const runMigrations = (db: DatabaseType): void => {
   db.exec(SCHEMA);
-  log('info', 'db.migrated', { tables: ['users', 'provider_usage', 'translation_cache'] });
+  log('info', 'db.migrated', {
+    tables: ['users', 'provider_usage', 'translation_cache', 'owner_prefs'],
+  });
 };

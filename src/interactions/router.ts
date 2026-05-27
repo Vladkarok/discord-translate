@@ -8,6 +8,8 @@
 import { MessageFlags, type Interaction } from 'discord.js';
 import type { Config } from '../config.js';
 import type { OwnerPrefsRepository } from '../db/owner-prefs.js';
+import type { ProviderUsageRepository } from '../db/provider-usage.js';
+import type { TranslationCacheRepository } from '../db/cache.js';
 import type { UsersRepository } from '../db/users.js';
 import type { TranslateService } from '../services/translate.js';
 import type { SessionStore } from '../sessions/store.js';
@@ -15,11 +17,13 @@ import { log } from '../logger.js';
 import {
   ACCESS_COMMAND_NAME,
   FRIENDS_COMMAND_NAME,
+  QUOTA_COMMAND_NAME,
   SETTINGS_COMMAND_NAME,
   TRANSLATE_COMMAND_NAME,
 } from '../commands/definitions.js';
 import { handleAccess } from './access.js';
 import { handleFriends } from './friends.js';
+import { handleQuotaStatus } from './quota.js';
 import { handleSettingsShow } from './settings.js';
 import { handleTranslate } from './translate.js';
 import { handleTranslatePanel } from './translate-panel.js';
@@ -28,6 +32,8 @@ export interface RouterDeps {
   readonly config: Config;
   readonly users: UsersRepository;
   readonly ownerPrefs: OwnerPrefsRepository;
+  readonly usage: ProviderUsageRepository;
+  readonly cache: TranslationCacheRepository;
   readonly translateService: TranslateService;
   readonly sessions: SessionStore;
 }
@@ -54,6 +60,9 @@ export const buildInteractionRouter =
             return;
           case ACCESS_COMMAND_NAME:
             await handleAccess(interaction, deps.config, deps.users);
+            return;
+          case QUOTA_COMMAND_NAME:
+            await handleQuotaStatus(interaction, deps.config, deps.users, deps.usage, deps.cache);
             return;
         }
       }

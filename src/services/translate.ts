@@ -28,6 +28,7 @@ import {
   type TranslationProvider,
 } from '../providers/types.js';
 import type { ProviderUsageRepository } from '../db/provider-usage.js';
+import type { TranslationCacheRepository } from '../db/cache.js';
 import { log } from '../logger.js';
 
 export interface TranslateRequest {
@@ -45,6 +46,7 @@ export interface TranslateSuccess {
   readonly originalText: string;
   readonly translatedText: string;
   readonly billedCharacters: number;
+  readonly fromCache: boolean;
 }
 
 export type TranslateFailureKind =
@@ -68,7 +70,9 @@ export type TranslateOutcome = TranslateSuccess | TranslateFailure;
 export interface TranslateServiceDeps {
   readonly provider: TranslationProvider;
   readonly usage: ProviderUsageRepository;
+  readonly cache: TranslationCacheRepository;
   readonly providerMonthlyLimit: number;
+  readonly storeSourceText: boolean;
 }
 
 export const createTranslateService = (deps: TranslateServiceDeps) => {
@@ -82,11 +86,48 @@ export const createTranslateService = (deps: TranslateServiceDeps) => {
       return { ok: false, kind: 'empty_input', message: 'That message has no text to translate.' };
     }
 
-    // Protect non-translatable spans, then build the provider payload.
+    // Protect non-translatable spans.
     const { masked, originals } = protect(req.text);
-    const payload = toHtmlPayload(masked);
+    const sourceKey = req.sourceLanguage ?? 'auto';
 
-    // Re-ensure if the month rolled over while the bot was running.
+    // --- Cache lookup ---
+    const cacheKey = deps.cache.computeKey({
+      provider: deps.provider.name,
+      sourceLanguage: sourceKey,
+      targetLanguage: req.targetLanguage,
+      maskedText: masked,
+    });
+
+    const hit = deps.cache.get(cacheKey);
+    if (hit) {
+      try {
+        const rehydrated = rehydrate(hit.translated_text, originals);
+        log('info', 'translate.cache_hit', {
+          provider: deps.provider.name,
+          target: req.targetLanguage,
+        });
+        return {
+          ok: true,
+          provider: deps.provider.name,
+          sourceLanguage: hit.source_language,
+          targetLanguage: req.targetLanguage,
+          detected: sourceKey === 'auto',
+          originalText: req.text,
+          translatedText: rehydrated,
+          billedCharacters: 0,
+          fromCache: true,
+        };
+      } catch (err: unknown) {
+        // Cache entry's placeholder count doesn't match this request's
+        // originals — treat as miss and continue.
+        log('warn', 'translate.cache_placeholder_mismatch', {
+          err: err instanceof PlaceholderIntegrityError ? err.detail : String(err),
+        });
+      }
+    }
+
+    // --- Quota reservation ---
+    const payload = toHtmlPayload(masked);
     const monthNow = new Date().toISOString().slice(0, 7);
     if (monthNow !== lastEnsuredMonth) {
       deps.usage.ensure(deps.provider.name, deps.providerMonthlyLimit);
@@ -104,9 +145,9 @@ export const createTranslateService = (deps: TranslateServiceDeps) => {
       };
     }
 
+    // --- Provider call ---
     let providerResult;
     try {
-      // exactOptionalPropertyTypes — only include sourceLanguage when set.
       const providerInput =
         req.sourceLanguage === undefined
           ? { text: payload, targetLanguage: req.targetLanguage }
@@ -130,14 +171,12 @@ export const createTranslateService = (deps: TranslateServiceDeps) => {
       return { ok: false, kind: mapErrorKind(kind), message };
     }
 
-    // Rehydrate placeholders. Strip Google's HTML wrapping first.
+    // --- Rehydrate + cache store ---
+    const unwrapped = fromHtmlPayload(providerResult.translatedText);
     let translatedText: string;
     try {
-      const unwrapped = fromHtmlPayload(providerResult.translatedText);
       translatedText = rehydrate(unwrapped, originals);
     } catch (err: unknown) {
-      // Placeholder corruption — Google already billed us. Keep reservation,
-      // surface a clear error.
       log('error', 'translate.placeholder_corruption', {
         err: err instanceof PlaceholderIntegrityError ? err.detail : String(err),
         billed,
@@ -150,6 +189,19 @@ export const createTranslateService = (deps: TranslateServiceDeps) => {
       };
     }
 
+    // Cache the pre-rehydrate translation. Different users hitting the
+    // same masked text will get a hit and rehydrate with their own
+    // originals.
+    deps.cache.put({
+      key: cacheKey,
+      provider: deps.provider.name,
+      sourceLanguage: providerResult.sourceLanguage,
+      targetLanguage: req.targetLanguage,
+      maskedText: masked,
+      translatedText: unwrapped,
+      storeSourceText: deps.storeSourceText,
+    });
+
     return {
       ok: true,
       provider: providerResult.provider,
@@ -159,6 +211,7 @@ export const createTranslateService = (deps: TranslateServiceDeps) => {
       originalText: req.text,
       translatedText,
       billedCharacters: billed,
+      fromCache: false,
     };
   };
 };

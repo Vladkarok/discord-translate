@@ -111,8 +111,10 @@ export const handleTranslate = async (
     lastDetectedSource: outcome.sourceLanguage,
   });
 
+  const payload = renderTranslation(outcome);
   await interaction.editReply({
-    content: renderTranslation(outcome),
+    content: payload.content,
+    embeds: payload.embeds ?? [],
     components: initialPanelFor({
       sessionId,
       outcome,

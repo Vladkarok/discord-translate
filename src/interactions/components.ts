@@ -33,11 +33,9 @@ export const SUPPORTED_LANGS = [
 
 const SOURCE_OPTIONS = [{ value: 'auto', label: 'Auto-detect' }, ...SUPPORTED_LANGS];
 
-export const isValidLang = (v: string): boolean =>
-  SUPPORTED_LANGS.some((l) => l.value === v);
+export const isValidLang = (v: string): boolean => SUPPORTED_LANGS.some((l) => l.value === v);
 
-export const isValidSource = (v: string): boolean =>
-  v === 'auto' || isValidLang(v);
+export const isValidSource = (v: string): boolean => v === 'auto' || isValidLang(v);
 
 export const buildPanel = (params: {
   readonly sessionId: string;

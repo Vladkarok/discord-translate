@@ -1,16 +1,18 @@
 /**
  * discord-translate — entrypoint.
  *
- * Boot sequence (M4):
+ * Boot sequence (M5):
  *   1. Load + validate env (Zod; fails fast on missing vars).
  *   2. Open SQLite, run idempotent migrator.
- *   3. Build repositories (users, owner_prefs, provider_usage), provider
- *      adapter, translation service, in-memory session store.
- *   4. Register global commands unless SKIP_COMMAND_REGISTRATION=true.
- *   5. Build discord.js Client (zero intents).
- *   6. Attach interaction router with all deps injected.
- *   7. Login. Discord gateway keep-alive owns the event loop.
- *   8. SIGTERM/SIGINT → client.destroy() → sessions.stop() →
+ *   3. Build repositories (users, owner_prefs, provider_usage,
+ *      translation_cache), provider adapter, translation service,
+ *      in-memory session store.
+ *   4. Prune cache entries older than 30 days.
+ *   5. Register global commands unless SKIP_COMMAND_REGISTRATION=true.
+ *   6. Build discord.js Client (zero intents).
+ *   7. Attach interaction router with all deps injected.
+ *   8. Login. Discord gateway keep-alive owns the event loop.
+ *   9. SIGTERM/SIGINT → client.destroy() → sessions.stop() →
  *      db.close() → exit.
  *
  * Run locally with:
@@ -27,27 +29,38 @@ import { runMigrations } from './db/migrate.js';
 import { createUsersRepository } from './db/users.js';
 import { createOwnerPrefsRepository } from './db/owner-prefs.js';
 import { createProviderUsageRepository } from './db/provider-usage.js';
+import { createTranslationCacheRepository } from './db/cache.js';
 import { createGoogleProvider } from './providers/google.js';
 import { createTranslateService } from './services/translate.js';
 import { createSessionStore } from './sessions/store.js';
+
+const CACHE_RETENTION_DAYS = 30;
 
 const main = async (): Promise<void> => {
   const config = loadConfig();
   setLogLevel(config.LOG_LEVEL);
 
-  log('info', 'bot.starting', { version: '0.4.0', node: process.version });
+  log('info', 'bot.starting', { version: '0.5.0', node: process.version });
 
   const db = openDatabase(config.DATABASE_PATH);
   runMigrations(db);
   const users = createUsersRepository(db);
   const ownerPrefs = createOwnerPrefsRepository(db);
   const usage = createProviderUsageRepository(db);
+  const cache = createTranslationCacheRepository(db);
+
+  const pruned = cache.prune(CACHE_RETENTION_DAYS);
+  if (pruned > 0) {
+    log('info', 'cache.pruned', { rows: pruned, retentionDays: CACHE_RETENTION_DAYS });
+  }
 
   const provider = createGoogleProvider({ apiKey: config.GOOGLE_TRANSLATE_API_KEY });
   const translateService = createTranslateService({
     provider,
     usage,
+    cache,
     providerMonthlyLimit: config.GOOGLE_MONTHLY_CHAR_LIMIT,
+    storeSourceText: config.CACHE_STORE_SOURCE_TEXT,
   });
 
   const sessions = createSessionStore();
@@ -66,7 +79,15 @@ const main = async (): Promise<void> => {
   attachLifecycleLogging(client);
   attachInteractionHandler(
     client,
-    buildInteractionRouter({ config, users, ownerPrefs, translateService, sessions }),
+    buildInteractionRouter({
+      config,
+      users,
+      ownerPrefs,
+      usage,
+      cache,
+      translateService,
+      sessions,
+    }),
   );
 
   const shutdown = (signal: NodeJS.Signals): void => {

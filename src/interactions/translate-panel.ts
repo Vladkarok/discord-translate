@@ -217,8 +217,10 @@ const rerunAndPaint = async (
     return;
   }
 
+  const payload = renderTranslation(outcome);
   await interaction.editReply({
-    content: renderTranslation(outcome),
+    content: payload.content,
+    embeds: payload.embeds ?? [],
     components: buildPanel({
       sessionId,
       currentSource: updated.currentSource,

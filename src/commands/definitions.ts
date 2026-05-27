@@ -25,6 +25,7 @@ export const TRANSLATE_COMMAND_NAME = 'Translate';
 export const SETTINGS_COMMAND_NAME = 'settings';
 export const FRIENDS_COMMAND_NAME = 'friends';
 export const ACCESS_COMMAND_NAME = 'access';
+export const QUOTA_COMMAND_NAME = 'quota';
 
 const translateCommand: RESTPostAPIApplicationCommandsJSONBody = {
   name: TRANSLATE_COMMAND_NAME,
@@ -114,9 +115,25 @@ const accessCommand: RESTPostAPIApplicationCommandsJSONBody = {
   ],
 };
 
+const quotaCommand: RESTPostAPIApplicationCommandsJSONBody = {
+  name: QUOTA_COMMAND_NAME,
+  description: 'Show translation quota usage.',
+  type: ApplicationCommandType.ChatInput,
+  integration_types: [...INTEGRATION_TYPES],
+  contexts: [...CONTEXTS],
+  options: [
+    {
+      name: 'status',
+      description: 'Show monthly character usage and cache size.',
+      type: ApplicationCommandOptionType.Subcommand,
+    },
+  ],
+};
+
 export const COMMAND_DEFINITIONS: readonly RESTPostAPIApplicationCommandsJSONBody[] = [
   translateCommand,
   settingsCommand,
   friendsCommand,
   accessCommand,
+  quotaCommand,
 ];

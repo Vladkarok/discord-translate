@@ -9,6 +9,7 @@
 import { MessageFlags, type Interaction } from 'discord.js';
 import type { Config } from '../config.js';
 import type { UsersRepository } from '../db/users.js';
+import type { TranslateService } from '../services/translate.js';
 import { log } from '../logger.js';
 import {
   ACCESS_COMMAND_NAME,
@@ -24,6 +25,7 @@ import { handleTranslate } from './translate.js';
 export interface RouterDeps {
   readonly config: Config;
   readonly users: UsersRepository;
+  readonly translateService: TranslateService;
 }
 
 export const buildInteractionRouter =
@@ -34,7 +36,7 @@ export const buildInteractionRouter =
         interaction.isMessageContextMenuCommand() &&
         interaction.commandName === TRANSLATE_COMMAND_NAME
       ) {
-        await handleTranslate(interaction, deps.config, deps.users);
+        await handleTranslate(interaction, deps.config, deps.users, deps.translateService);
         return;
       }
 

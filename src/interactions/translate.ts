@@ -1,21 +1,41 @@
 /**
- * Translate message-context handler — M2 wires access control on top of
- * the M1 placeholder. Provider call still lands in M3.
+ * Translate message-context handler — M3: real Google translation.
  *
- * Defer-first rule (plan §Interaction Flow): the first action is always
- * deferReply ephemeral. Access checks, DB reads, and (M3) provider calls
- * all happen *after* the 3-second ack deadline is safely satisfied.
+ * Defer-first → access check → resolve target language → run orchestrator
+ * → render. The orchestrator owns quota, placeholder safety, provider
+ * call, and refund semantics.
+ *
+ * Target language resolution (interactive override lands in M4):
+ *   1. Discord interaction locale → ISO code, if mappable.
+ *   2. Config DEFAULT_TARGET_LANGUAGE.
  */
 import { MessageFlags, type MessageContextMenuCommandInteraction } from 'discord.js';
 import { denialMessage, resolveAccess } from '../access.js';
 import type { Config } from '../config.js';
 import type { UsersRepository } from '../db/users.js';
 import { log } from '../logger.js';
+import type { TranslateService } from '../services/translate.js';
+import { renderTranslation } from '../text/render.js';
+
+const LOCALE_TO_ISO: Readonly<Record<string, string>> = {
+  'en-US': 'en',
+  'en-GB': 'en',
+  fr: 'fr',
+  uk: 'uk',
+};
+
+const resolveTargetLanguage = (locale: string | null, config: Config): string => {
+  if (locale && locale in LOCALE_TO_ISO) {
+    return LOCALE_TO_ISO[locale]!;
+  }
+  return config.DEFAULT_TARGET_LANGUAGE;
+};
 
 export const handleTranslate = async (
   interaction: MessageContextMenuCommandInteraction,
   config: Config,
   users: UsersRepository,
+  translateService: TranslateService,
 ): Promise<void> => {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -31,22 +51,35 @@ export const handleTranslate = async (
   }
 
   const target = interaction.targetMessage;
-  const charCount = target.content.length;
+  const targetLang = resolveTargetLanguage(interaction.locale, config);
 
-  // Privacy: log character count and context metadata, never message body.
   log('info', 'translate.invoked', {
     userId: interaction.user.id,
     role: access.role,
     targetMessageId: target.id,
-    charCount,
+    charCount: target.content.length,
+    targetLang,
     context: interaction.context,
-    locale: interaction.locale,
   });
 
-  await interaction.editReply({
-    content: [
-      'Translation coming soon.',
-      `(M2 placeholder — access OK as **${access.role}**, ${String(charCount)} chars received.)`,
-    ].join('\n'),
+  const outcome = await translateService({
+    text: target.content,
+    sourceLanguage: 'auto',
+    targetLanguage: targetLang,
   });
+
+  if (!outcome.ok) {
+    log('warn', 'translate.failed', { kind: outcome.kind });
+    await interaction.editReply({ content: outcome.message });
+    return;
+  }
+
+  log('info', 'translate.success', {
+    provider: outcome.provider,
+    source: outcome.sourceLanguage,
+    target: outcome.targetLanguage,
+    billed: outcome.billedCharacters,
+  });
+
+  await interaction.editReply({ content: renderTranslation(outcome) });
 };

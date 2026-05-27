@@ -14,11 +14,15 @@ const envSchema = z.object({
   DISCORD_PUBLIC_KEY: z.string().optional(),
   OWNER_DISCORD_ID: z.string().min(1, 'OWNER_DISCORD_ID is required'),
 
-  // DeepL — required from M3 onward. Optional at M1.
+  // Translation provider — Google Cloud Translation v2 (API key auth).
+  // DeepL was the original v1 provider; pivoted to Google after DeepL
+  // Free API plan closed signups. DeepL vars stay parseable but unused
+  // so an existing-key user can wire them up later.
+  GOOGLE_TRANSLATE_API_KEY: z.string().min(1, 'GOOGLE_TRANSLATE_API_KEY is required'),
+  GOOGLE_MONTHLY_CHAR_LIMIT: z.coerce.number().int().positive().default(500_000),
   DEEPL_API_KEY: z.string().optional(),
-  DEEPL_API_URL: z.string().url().default('https://api-free.deepl.com'),
-  DEEPL_MONTHLY_CHAR_LIMIT: z.coerce.number().int().positive().default(500_000),
-  DEFAULT_ENGLISH_VARIANT: z.enum(['EN-US', 'EN-GB']).default('EN-US'),
+  DEEPL_API_URL: z.string().url().optional(),
+  DEEPL_MONTHLY_CHAR_LIMIT: z.coerce.number().int().positive().optional(),
 
   // Cache / behaviour. Defaults are post-transform booleans; Zod v4
   // applies them when the env var is unset.

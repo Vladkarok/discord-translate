@@ -109,6 +109,7 @@ export const handleTranslate = async (
     currentSource: 'auto',
     currentTarget: targetLang,
     lastDetectedSource: outcome.sourceLanguage,
+    panelExpanded: false,
   });
 
   const payload = renderTranslation(outcome);

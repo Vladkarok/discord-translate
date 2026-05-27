@@ -25,7 +25,7 @@ export const handleSettingsShow = async (
     content: [
       '**Settings**',
       `- default target language: \`${config.DEFAULT_TARGET_LANGUAGE}\``,
-      `- DeepL monthly limit: \`${String(config.DEEPL_MONTHLY_CHAR_LIMIT)}\` chars`,
+      `- Google monthly limit: \`${config.GOOGLE_MONTHLY_CHAR_LIMIT.toLocaleString('en-US')}\` chars`,
       `- cache stores source text: \`${String(config.CACHE_STORE_SOURCE_TEXT)}\``,
       `- friends allowlisted: \`${String(users.count())}\``,
     ].join('\n'),

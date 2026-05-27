@@ -85,7 +85,49 @@ export const handleTranslatePanel = async (
     case 'sv':
       await handleSave(interaction as ButtonInteraction, parsed.sessionId, session, deps);
       return;
+    case 'show':
+    case 'hide':
+      await handleToggle(
+        interaction as ButtonInteraction,
+        parsed.sessionId,
+        session,
+        deps,
+        parsed.action === 'show',
+      );
+      return;
   }
+};
+
+/**
+ * Toggle the panel between collapsed (just the ⚙ button) and
+ * expanded (Source/Target/Swap/Save). No re-translation, no quota
+ * spend — just a component repaint.
+ */
+const handleToggle = async (
+  interaction: ButtonInteraction,
+  sessionId: string,
+  session: TranslationSession,
+  deps: PanelDeps,
+  expand: boolean,
+): Promise<void> => {
+  await interaction.deferUpdate();
+  const updated = deps.sessions.update(sessionId, { panelExpanded: expand });
+  if (!updated) {
+    await interaction.editReply({
+      content: 'Session expired mid-action. Right-click the message and run **Translate** again.',
+      components: [],
+    });
+    return;
+  }
+  await interaction.editReply({
+    components: buildPanel({
+      sessionId,
+      currentSource: updated.currentSource,
+      currentTarget: updated.currentTarget,
+      canSwap: canSwap(updated),
+      expanded: updated.panelExpanded,
+    }),
+  });
 };
 
 const handleSourceSelect = async (
@@ -197,6 +239,7 @@ const rerunAndPaint = async (
         currentSource: next.currentSource,
         currentTarget: next.currentTarget,
         canSwap: canSwap(next),
+        expanded: next.panelExpanded,
       }),
     });
     return;
@@ -226,6 +269,7 @@ const rerunAndPaint = async (
       currentSource: updated.currentSource,
       currentTarget: updated.currentTarget,
       canSwap: canSwap(updated),
+      expanded: updated.panelExpanded,
     }),
   });
 };
@@ -253,7 +297,9 @@ export const initialPanelFor = (params: {
       currentSource: params.currentSource,
       currentTarget: params.currentTarget,
       lastDetectedSource: params.outcome.sourceLanguage,
+      panelExpanded: false,
       createdAt: 0,
       expiresAt: 0,
     }),
+    expanded: false, // Panel starts collapsed; user opens it via the ⚙ toggle.
   });

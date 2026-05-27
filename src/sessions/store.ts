@@ -19,6 +19,7 @@ export interface TranslationSession {
   readonly currentSource: string; // 'auto' | 'en' | 'fr' | 'uk'
   readonly currentTarget: string; // 'en' | 'fr' | 'uk'
   readonly lastDetectedSource: string | null; // populated by the orchestrator after a call
+  readonly panelExpanded: boolean; // false → show only the toggle; true → show selects + buttons
   readonly createdAt: number;
   readonly expiresAt: number;
 }

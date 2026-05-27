@@ -1,13 +1,18 @@
 /**
  * Component builders for the interactive translation panel.
  *
- * Layout (3 of Discord's 5 allowed action rows):
- *   row 1: Source select  (Auto, English, French, Ukrainian)
- *   row 2: Target select  (English, French, Ukrainian)
- *   row 3: [ Swap ]  [ Save target ]
+ * Two layouts:
+ *   Collapsed (default after Translate):
+ *     row 1: [ ⚙ Change language ]
+ *   Expanded (after user clicks the toggle):
+ *     row 1: Source select  (Auto, English, French, Ukrainian)
+ *     row 2: Target select  (English, French, Ukrainian)
+ *     row 3: [ Swap ]  [ Save target ]  [ Hide ]
+ *
+ * Toggling does NOT re-translate — it only repaints the components.
  *
  * custom_id format: `dt:<action>:<sessionId>` — well under the 100-char
- * cap (action ≤ 3, sessionId = 36-char UUID).
+ * cap (action ≤ 4, sessionId = 36-char UUID).
  */
 import {
   ActionRowBuilder,
@@ -23,7 +28,11 @@ export const CUSTOM_ID = {
   target: 'dt:tgt:',
   swap: 'dt:sw:',
   save: 'dt:sv:',
+  show: 'dt:show:',
+  hide: 'dt:hide:',
 } as const;
+
+export type PanelAction = 'src' | 'tgt' | 'sw' | 'sv' | 'show' | 'hide';
 
 export const SUPPORTED_LANGS = [
   { value: 'en', label: 'English' },
@@ -42,7 +51,16 @@ export const buildPanel = (params: {
   readonly currentSource: string;
   readonly currentTarget: string;
   readonly canSwap: boolean;
+  readonly expanded: boolean;
 }): readonly ActionRowBuilder<MessageActionRowComponentBuilder>[] => {
+  if (!params.expanded) {
+    const showBtn = new ButtonBuilder()
+      .setCustomId(CUSTOM_ID.show + params.sessionId)
+      .setLabel('⚙ Change language')
+      .setStyle(ButtonStyle.Secondary);
+    return [new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(showBtn)];
+  }
+
   const sourceSelect = new StringSelectMenuBuilder()
     .setCustomId(CUSTOM_ID.source + params.sessionId)
     .setPlaceholder('Source language')
@@ -78,20 +96,29 @@ export const buildPanel = (params: {
     .setLabel('Save target')
     .setStyle(ButtonStyle.Primary);
 
+  const hideBtn = new ButtonBuilder()
+    .setCustomId(CUSTOM_ID.hide + params.sessionId)
+    .setLabel('Hide')
+    .setStyle(ButtonStyle.Secondary);
+
   return [
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(sourceSelect),
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(targetSelect),
-    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(swapBtn, saveBtn),
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      swapBtn,
+      saveBtn,
+      hideBtn,
+    ),
   ];
 };
 
 export const parseCustomId = (
   customId: string,
-): { readonly action: 'src' | 'tgt' | 'sw' | 'sv'; readonly sessionId: string } | null => {
-  const m = /^dt:(src|tgt|sw|sv):([\w-]{36})$/.exec(customId);
+): { readonly action: PanelAction; readonly sessionId: string } | null => {
+  const m = /^dt:(src|tgt|sw|sv|show|hide):([\w-]{36})$/.exec(customId);
   if (!m) return null;
   return {
-    action: m[1] as 'src' | 'tgt' | 'sw' | 'sv',
+    action: m[1] as PanelAction,
     sessionId: m[2]!,
   };
 };

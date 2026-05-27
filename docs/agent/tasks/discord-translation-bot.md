@@ -1,9 +1,9 @@
 # Task: Build the v1 Discord translation bot
 
-**Status:** in progress
+**Status:** completed
 **Started:** 2026-05-25
-**Completed:** —
-**Active:** yes
+**Completed:** 2026-05-27
+**Active:** no
 **Slug:** discord-translation-bot
 
 ## Goal
@@ -27,7 +27,7 @@ Full product spec: `docs/plans/discord-translation-bot.md`.
       `MessageContent` intent off).
     - Remove template-package detritus from the repo tree.
     - Create this task file.
-- [ ] Step 1 (M0): Project bootstrap
+- [x] Step 1 (M0): Project bootstrap
     - TypeScript package: `package.json`, `tsconfig.json`, `npm scripts`
       for typecheck/lint/format/test.
     - Dockerfile (Node official image, non-root `USER node`).
@@ -35,7 +35,7 @@ Full product spec: `docs/plans/discord-translation-bot.md`.
     - `.env.example` with all v1 variables (no real secrets anywhere).
     - Lint/format toolchain (eslint + prettier or biome — TBD).
     - Acceptance: `npm run typecheck` passes; `docker compose config` passes.
-- [ ] Step 2 (M1): Discord skeleton + user-install verification
+- [x] Step 2 (M1): Discord skeleton + user-install verification
     - `discord.js` client startup with zero privileged intents.
     - Register `Translate` message context-menu command.
     - Idempotent registration runs on container start (skip via env).
@@ -47,7 +47,7 @@ Full product spec: `docs/plans/discord-translation-bot.md`.
       the gate before any provider work (self-review #2).
     - Acceptance: bot installable; `Apps -> Translate` visible in DM;
       unauthorized users get a private denial.
-- [ ] Step 3 (M2): Database + access control
+- [x] Step 3 (M2): Database + access control
     - `better-sqlite3` setup; startup migrator with idempotent
       `CREATE TABLE IF NOT EXISTS`.
     - Tables: `users`, `provider_usage`, `translation_cache`
@@ -56,7 +56,7 @@ Full product spec: `docs/plans/discord-translation-bot.md`.
     - DM-only default for friends; `/access server enable/disable`.
     - Acceptance: owner adds a friend; friend translates in DM only;
       server denied by default; owner toggle works.
-- [ ] Step 4 (M3): DeepL provider
+- [x] Step 4 (M3): Translation provider (DeepL → pivoted to Google)
     - `TranslationProvider` interface with sync `supports()`.
     - DeepL adapter against `api-free.deepl.com`.
     - Language map for en/fr/uk; auto-detect support.
@@ -75,7 +75,7 @@ Full product spec: `docs/plans/discord-translation-bot.md`.
     - Acceptance: uk→en, fr→en, en→fr all work; provider quota reserves
       atomically; over-quota call is rejected before HTTP; same-language
       known pairs are prompted before billing; timeouts/5xx do not refund.
-- [ ] Step 5 (M4): Interactive source/target controls
+- [x] Step 5 (M4): Interactive source/target controls (plus M5.5 collapsible toggle)
     - `Source` / `Target` select menus.
     - `Swap` button (disabled when source is auto).
     - `Save target` button.
@@ -88,7 +88,7 @@ Full product spec: `docs/plans/discord-translation-bot.md`.
     - Acceptance: user can change source, target, swap, and save;
       another user cannot operate someone else's controls; expired
       session returns a clear ephemeral message.
-- [ ] Step 6 (M5): Cache, polish, long messages
+- [x] Step 6 (M5): Cache, polish, long messages
     - Translation cache (hash-only) with 30d retention.
     - `/quota status` (owner sees aggregate, friend sees own).
     - Discord-aware rendering: bot message `content` cap = 2000;
@@ -98,7 +98,7 @@ Full product spec: `docs/plans/discord-translation-bot.md`.
     - Structured logs (no message content by default).
     - Acceptance: repeat translation hits cache; long messages
       don't error at Discord API layer.
-- [ ] Step 7 (M6): VPS deployment
+- [x] Step 7 (M6): Deploy docs + ops scripts (VPS deployment is a user action)
     - `docker compose up -d` on the VPS.
     - Persistent volume mount confirmed; restart policy verified.
     - Document Discord Developer Portal + DeepL Free setup in
@@ -158,27 +158,29 @@ lines 121–137 they do not belong in the project tree.
 
 ## Current edge
 
-Step 0 / plan refinement is complete. The canonical plan now has the useful
-deep-research refinements folded in: Discord `USER_INSTALL`/`PRIVATE_CHANNEL`
-verification, edit-original ephemeral response rule, formatting protection,
-placeholder integrity checks, DeepL language mapping, refund-only-when-
-definitely-unbilled quota semantics, no default per-user daily cap, rationale
-comments, and V1.x/V2 evolution boundaries.
+**Task complete.** v1 is feature-complete, documented, and manually
+verified against a live Discord client + GCP Translation API. Final
+commit: `9fb0050 docs: deployment + ops walk-throughs and SQLite
+backup scripts (M6)`. Nothing pushed yet — that's `publish session`.
 
-Next agent should pick up at **Step 1 (M0)**: scaffold the TypeScript
-package, Dockerfile, and Compose file. Before writing any Discord
-client code, verify on a throwaway app that the user-install +
-message-context-menu UX actually works in DMs (self-review #2 in the
-plan).
+If new work appears (V1.x polish, V2 capabilities, bug fixes), open
+a fresh task file under `docs/agent/tasks/` rather than reopening
+this one.
+
+## Resolutions to prior open questions
+
+- Lint/format: **ESLint + Prettier** (flat config v9, type-aware on
+  `src/**`).
+- Package manager: **npm**.
+- Group DM behaviour: enabled (`contexts: [Guild, BotDM, PrivateChannel]`).
+  Manually verified during M1.
+- DeepL pivoted to Google mid-build because DeepL Free closed signups.
+  Architecture unchanged — TranslationProvider interface scoped for
+  exactly this swap. See the Decisions section above and the M3
+  commit (`129abb7`).
+- `docs/plans/deep-research-report.md`: still untracked. User has
+  not yet decided commit/delete/ignore.
 
 ## Open questions
 
-- Lint/format choice for the TS package: ESLint + Prettier (industry
-  default, more config) vs. Biome (single fast tool, less mature).
-  Pick at Step 1.
-- Use `pnpm` vs `npm`? Personal scale → either works. Default to npm
-  unless reason emerges.
-- Group DM behaviour: treat as DM, or disable until tested? Decide
-  during Step 2 manual verification.
-- Keep, delete, or ignore `docs/plans/deep-research-report.md`? It was used
-  as advisory input and is still untracked.
+- (Carried forward) Fate of `docs/plans/deep-research-report.md`.

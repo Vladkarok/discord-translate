@@ -38,3 +38,10 @@ Entry format:
 - Reversed default per-user daily cap: v1 now uses provider monthly quota as the hard stop; optional per-user throttle is deferred until real abuse/noise appears.
 - Added DeepL mapping, placeholder integrity, refund-only-when-definitely-unbilled quota semantics, and V1/V2 evolution boundaries.
 - see: docs/agent/sessions/2026-05-26-174746-codex-plan-rationale.md
+
+## 2026-05-27 22:40 claude v1-complete
+
+- Shipped M0–M6 in one multi-turn session: TS package + Docker, discord.js client, SQLite + access control, Google Cloud Translation v2 adapter (pivoted from DeepL mid-build), interactive collapsible panel + session store, hash-only cache + /quota status + embed promotion, and deploy docs + backup scripts.
+- Manually verified M1–M5 against the user's live Discord client and GCP Translation API. Final commit: `9fb0050 docs: deployment + ops walk-throughs and SQLite backup scripts (M6)`.
+- Marked active task `discord-translation-bot` completed (Active: no). The bot is feature-complete and documented; nothing pushed yet.
+- see: docs/agent/sessions/2026-05-27-224000-claude-v1-complete.md

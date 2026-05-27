@@ -40,3 +40,4 @@ Read on demand (look up "when did we decide X?"), not loaded on every
 2026-05-25 · Discord MessageContent intent stays disabled; message context commands deliver target message in the interaction payload · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
 2026-05-25 · Container runs as non-root via Node official image's USER node · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
 2026-05-26 · Reverse 2026-05-25 per-user daily cap decision — v1 uses provider monthly hard stop; optional per-user throttle only if real abuse appears · docs/agent/sessions/2026-05-26-174746-codex-plan-rationale.md
+2026-05-27 · Switch translation provider from DeepL Free to Google Cloud Translation v2 (DeepL Free API signups closed; Google offers a recurring ~500K NMT chars/month free credit, not a 12-month trial). Provider interface unchanged. · docs/agent/sessions/2026-05-27-224000-claude-v1-complete.md

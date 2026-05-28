@@ -16,8 +16,8 @@ import { randomUUID } from 'node:crypto';
 export interface TranslationSession {
   readonly userId: string;
   readonly originalText: string;
-  readonly currentSource: string; // 'auto' | 'en' | 'fr' | 'uk'
-  readonly currentTarget: string; // 'en' | 'fr' | 'uk'
+  readonly currentSource: string; // 'auto' | 'en' | 'fr' | 'uk' | 'ru'
+  readonly currentTarget: string; // 'en' | 'fr' | 'uk' | 'ru'
   readonly lastDetectedSource: string | null; // populated by the orchestrator after a call
   readonly panelExpanded: boolean; // false → show only the toggle; true → show selects + buttons
   readonly createdAt: number;

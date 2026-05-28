@@ -20,10 +20,10 @@ import { ProviderError, type TranslationProvider } from './types.js';
 const ENDPOINT = 'https://translation.googleapis.com/language/translate/v2';
 const PROVIDER_NAME = 'google';
 
-// Google v2 accepts ISO 639-1 codes. Our internal `en`, `fr`, `uk` map
-// 1:1 (no regional variants required).
-const SUPPORTED_TARGETS = new Set(['en', 'fr', 'uk']);
-const SUPPORTED_SOURCES = new Set(['en', 'fr', 'uk', 'auto']);
+// Google v2 accepts ISO 639-1 codes. Our internal `en`, `fr`, `uk`, `ru`
+// map 1:1 (no regional variants required).
+const SUPPORTED_TARGETS = new Set(['en', 'fr', 'uk', 'ru']);
+const SUPPORTED_SOURCES = new Set(['en', 'fr', 'uk', 'ru', 'auto']);
 
 export interface GoogleProviderOptions {
   readonly apiKey: string;

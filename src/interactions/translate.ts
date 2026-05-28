@@ -24,6 +24,7 @@ const LOCALE_TO_ISO: Readonly<Record<string, string>> = {
   'en-GB': 'en',
   fr: 'fr',
   uk: 'uk',
+  ru: 'ru',
 };
 
 export interface TranslateHandlerDeps {

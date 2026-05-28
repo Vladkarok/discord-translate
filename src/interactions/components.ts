@@ -5,8 +5,8 @@
  *   Collapsed (default after Translate):
  *     row 1: [ ⚙ Change language ]
  *   Expanded (after user clicks the toggle):
- *     row 1: Source select  (Auto, English, French, Ukrainian)
- *     row 2: Target select  (English, French, Ukrainian)
+ *     row 1: Source select  (Auto, English, French, Ukrainian, Russian)
+ *     row 2: Target select  (English, French, Ukrainian, Russian)
  *     row 3: [ Swap ]  [ Save target ]  [ Hide ]
  *
  * Toggling does NOT re-translate — it only repaints the components.
@@ -38,6 +38,7 @@ export const SUPPORTED_LANGS = [
   { value: 'en', label: 'English' },
   { value: 'fr', label: 'French' },
   { value: 'uk', label: 'Ukrainian' },
+  { value: 'ru', label: 'Russian' },
 ] as const;
 
 const SOURCE_OPTIONS = [{ value: 'auto', label: 'Auto-detect' }, ...SUPPORTED_LANGS];

@@ -41,3 +41,7 @@ Read on demand (look up "when did we decide X?"), not loaded on every
 2026-05-25 · Container runs as non-root via Node official image's USER node · docs/agent/sessions/2026-05-25-222358-claude-bootstrap-and-plan-refinement.md
 2026-05-26 · Reverse 2026-05-25 per-user daily cap decision — v1 uses provider monthly hard stop; optional per-user throttle only if real abuse appears · docs/agent/sessions/2026-05-26-174746-codex-plan-rationale.md
 2026-05-27 · Switch translation provider from DeepL Free to Google Cloud Translation v2 (DeepL Free API signups closed; Google offers a recurring ~500K NMT chars/month free credit, not a 12-month trial). Provider interface unchanged. · docs/agent/sessions/2026-05-27-224000-claude-v1-complete.md
+2026-05-28 · Deploy via GHCR + self-hosted runner labeled `disctrans` (Unix user `gh-disctrans` on kc-github-runner); matches youtube-download-bot/email-to-telegram/shiny pattern · docs/agent/sessions/2026-05-28-204630-claude-cicd-and-russian.md
+2026-05-28 · VPS deploy key restricted by `from="IP"` + no-pty/no-fwd only (not forced-command); matches tg-audio-dl trust model · docs/agent/sessions/2026-05-28-204630-claude-cicd-and-russian.md
+2026-05-28 · Deploy trigger = push to master + workflow_dispatch; no release-tag ritual for a personal bot · docs/agent/sessions/2026-05-28-204630-claude-cicd-and-russian.md
+2026-05-28 · Russian added as supported source/target language (Google v2 accepts `ru` natively) · docs/agent/sessions/2026-05-28-204630-claude-cicd-and-russian.md

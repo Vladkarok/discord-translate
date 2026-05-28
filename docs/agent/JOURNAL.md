@@ -45,3 +45,10 @@ Entry format:
 - Manually verified M1–M5 against the user's live Discord client and GCP Translation API. Final commit: `9fb0050 docs: deployment + ops walk-throughs and SQLite backup scripts (M6)`.
 - Marked active task `discord-translation-bot` completed (Active: no). The bot is feature-complete and documented; nothing pushed yet.
 - see: docs/agent/sessions/2026-05-27-224000-claude-v1-complete.md
+
+## 2026-05-28 20:46 claude cicd-and-russian
+
+- Stood up full CI/CD: private repo `Vladkarok/discord-translate`, GH Actions CI (typecheck/lint/format), Deploy workflow that builds+pushes to `ghcr.io/vladkarok/discord-translate` and ships to VPS via new self-hosted runner `kc-runner-github-disctrans` (user `gh-disctrans`) using SSH alias `disctrans-vprojects` with IP-locked non-interactive key. Bot live in prod; local container stopped to free Discord gateway lock.
+- Follow-on: added Russian (`ru`) to Google provider's accepted sets, SUPPORTED_LANGS list, and Discord LOCALE_TO_ISO map. Auto-deployed via the new pipeline.
+- Gotcha: VPS sshd silently rejects `from=10.0.89.2` without quotes; must be `from="10.0.89.2"`.
+- see: docs/agent/sessions/2026-05-28-204630-claude-cicd-and-russian.md

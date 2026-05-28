@@ -1,66 +1,72 @@
 # State
 
 **Protocol version:** 2
-**Updated:** 2026-05-27T22:40:00+02:00
+**Updated:** 2026-05-28T20:46:30+02:00
 **Tool last wrote:** Claude Code
 **Branch:** master
-**Last code commit:** 9fb005057df13f03368a10fd44560701e85c6da5 docs: deployment + ops walk-throughs and SQLite backup scripts (M6)
+**Last code commit:** 0085a33c6abbe9c3e7be36f8219a6392ea2f2335 feat: add Russian as supported translation language
 **Code worktree:** clean
 **Tracked dirty code paths:** none
-**Relevant untracked code paths:** docs/plans/deep-research-report.md — advisory research input, served its purpose during plan refinement; user has not yet decided to commit, delete, or .gitignore it
-**Active task:** discord-translation-bot
-**Latest session read:** docs/agent/sessions/2026-05-26-174746-codex-plan-rationale.md
+**Relevant untracked code paths:** docs/plans/deep-research-report.md — advisory research input from v1 plan refinement; user still hasn't decided to commit, delete, or .gitignore it
+**Active task:** none
+**Latest session read:** docs/agent/sessions/2026-05-27-224000-claude-v1-complete.md
 
 ## Now
 
-v1 is feature-complete and documented. All seven task steps (M0–M6)
-shipped across six feature commits, one fix, and one docs commit. Bot
-runs healthy in the user's local Docker Compose; manual verification
-of M1, M2, M3, M4, M5 all green via Discord client. Provider pivoted
-mid-build from DeepL Free (signups closed) to Google Cloud Translation
-v2 (API key + recurring monthly free credit). Nothing has been pushed.
+v1 + CI/CD is in production. Private repo `Vladkarok/discord-translate`
+on GitHub. Push-to-`master` builds image → pushes to GHCR → self-hosted
+runner deploys to VPS. Bot running on the VPS at
+`/home/vladkarok/apps/discord-translate`, currently image `:0085a33`
+(includes Russian language support). Local container stopped to avoid
+Discord gateway conflict.
 
 ## Resume prompt
 
-The bot is done. Read `docs/agent/tasks/discord-translation-bot.md`
-(every step marked `[x]`) and `README.md`. If the user wants to deploy
-to the VPS, follow `docs/deploy/vps.md` — the deploy walkthroughs and
-backup scripts in `scripts/` are tested locally. If the user runs
-`publish session`, push `master`. If the user reports a runtime issue
-post-deploy, start with `docker compose logs bot | grep -i error` and
-the troubleshooting matrices in `docs/deploy/*.md`. If new work
-appears, open a fresh task file under `docs/agent/tasks/` — this one
-is complete.
+The bot is live in production. Push to `master` triggers an automatic
+deploy: GitHub-hosted runner builds and pushes
+`ghcr.io/vladkarok/discord-translate:<short-sha>` and `:latest`, then
+the self-hosted runner `kc-runner-github-disctrans` (Unix user
+`gh-disctrans` on `kc-github-runner`) SSHes to VPS via alias
+`disctrans-vprojects`, runs `docker compose pull && up -d --no-build`,
+asserts the container stays up ~20s. To redeploy a specific image
+without code changes: `gh workflow run deploy.yml -f image_tag=<sha>`.
+`.env` lives only on the VPS (and locally); rotate via
+`scp ~/Work/discord-translate/.env kc-vprojects:/home/vladkarok/apps/discord-translate/.env`
+then re-run deploy. If something fails post-deploy, start with
+`ssh kc-vprojects 'cd apps/discord-translate && docker compose --env-file .env logs --tail 50 bot'`.
+No active task; open a fresh task file under `docs/agent/tasks/` when
+new multi-session work appears.
 
 ## In flight
 
-- Nothing in flight. All M0–M6 work committed locally.
+- Nothing in flight.
 - `docs/plans/deep-research-report.md` is still untracked; pending
   user decision (commit/delete/ignore).
 
 ## Next
 
-1. (User decision) Run `publish session` to push `master` to origin.
-2. (User decision) Resolve the untracked `deep-research-report.md`
-   one way or the other.
-3. (User-initiated) Deploy to the VPS per `docs/deploy/vps.md` if not
-   already done.
-4. (Optional) Open a new task file for V1.x polish or V2 work as
-   demand surfaces.
+1. (User decision) Resolve the untracked `deep-research-report.md`.
+2. (User-initiated, when usage demands) Open a task file for V1.x
+   polish (embed translation, attachment translation, per-user throttle)
+   or V2 (LLM tone mode, local MT, etc.) per
+   `docs/plans/discord-translation-bot.md` §Post-V1 Evolution.
 
 ## Open questions / blockers
 
 - Fate of `docs/plans/deep-research-report.md`: commit as appendix,
-  delete as scratch, or add to `.gitignore` as ongoing scratch.
-- Whether to start tracking V1.x polish candidates (text-bearing
-  embed translation, attachment translation with explicit consent,
-  provider-side quota reconciliation) in a new task file or wait for
-  the user to flag a concrete need.
+  delete as scratch, or `.gitignore`.
 
 ## Environments
 
-- Local dev (Linux, Docker + Compose):
-  `bot` container running healthy against user's `.env`.
-  verify-with: `docker compose ps`
-- VPS: not yet deployed.
-  verify-with: (set after first `publish session` + deploy)
+- Local dev (Linux, Docker + Compose): bot container stopped to avoid
+  Discord gateway conflict with prod.
+  verify-with: `docker ps --filter name=discord-translate --format '{{.Names}} {{.Status}}'`
+- VPS (`ssh kc-vprojects`): healthy, image `ghcr.io/vladkarok/discord-translate:<sha>`
+  at `/home/vladkarok/apps/discord-translate`, SQLite in named volume
+  `discord-translate_bot-data`.
+  verify-with: `ssh kc-vprojects 'cd apps/discord-translate && docker compose --env-file .env ps'`
+- Runner (`ssh kc-github-runner`): user `gh-disctrans`, systemd unit
+  `actions.runner.Vladkarok-discord-translate.kc-runner-github-disctrans.service`,
+  label `disctrans`, SSH alias `disctrans-vprojects` → VPS via
+  `~/.ssh/disctrans_vprojects_deploy` (IP-locked + non-interactive on VPS authorized_keys).
+  verify-with: `ssh kc-github-runner 'sudo systemctl is-active actions.runner.Vladkarok-discord-translate.kc-runner-github-disctrans.service'`

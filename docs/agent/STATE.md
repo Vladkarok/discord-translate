@@ -1,57 +1,56 @@
 # State
 
 **Protocol version:** 2
-**Updated:** 2026-06-11T19:38:52+02:00
+**Updated:** 2026-06-12T00:14:55+02:00
 **Tool last wrote:** Claude Code
 **Branch:** master
-**Last code commit:** 0085a33c6abbe9c3e7be36f8219a6392ea2f2335 feat: add Russian as supported translation language
+**Last code commit:** 727a53ea07725f92391213c4a6b2a0ea9d16dc8b test: vitest suite for pure modules (66 cases); CI gates on tests
 **Code worktree:** clean
-**Tracked dirty code paths:** none (AGENTS.md/CLAUDE.md/PROTOCOL.md dirty are memory-tier, staged in this save)
-**Relevant untracked code paths:** docs/plans/deep-research-report.md — advisory research input from v1 plan refinement; user still hasn't decided to commit, delete, or .gitignore it
+**Tracked dirty code paths:** none
+**Relevant untracked code paths:** docs/plans/deep-research-report.md — advisory research input; user decision still pending (commit/delete/ignore)
 **Active task:** none
-**Latest session read:** docs/agent/sessions/2026-06-11-182111-claude-remove-dual-graph-mempalace.md
+**Latest session read:** docs/agent/sessions/2026-06-11-193852-claude-config-cleanup-ecc-removal.md
 
 ## Now
 
-v1 + CI/CD is in production; no code changes since 0085a33 (image
-`:0085a33` on the VPS, includes Russian). Today's two sessions were
-tooling hygiene: dual-graph MCP removed from this repo, mempalace and
-the everything-claude-code plugin uninstalled machine-wide, global
-rules files and this repo's identity docs trimmed of ECC-specific
-wording (generic vendor-collision rule retained).
+Full code-review pass landed: 4 bugs fixed (fail-closed /quota context,
+stale embeds on panel failure, literal ⟦N⟧ masking, language validation
+via new src/languages.ts), lifecycle polish (version 1.0.0 from
+package.json, daily cache prune, shutdown watchdog, API key in header),
+and the first test suite — 66 vitest cases, CI now gates on `npm test`.
+Commits `c0c3d42` (fix) + `727a53e` (test). Deploying to prod now: push
+to master triggers build of `ghcr.io/vladkarok/discord-translate:727a53e`
+and auto-deploy to the VPS.
 
 ## Resume prompt
 
-The bot is live in production. Push to `master` triggers an automatic
-deploy: GitHub-hosted runner builds and pushes
-`ghcr.io/vladkarok/discord-translate:<short-sha>` and `:latest`, then
-the self-hosted runner `kc-runner-github-disctrans` (Unix user
-`gh-disctrans` on `kc-github-runner`) SSHes to VPS via alias
-`disctrans-vprojects`, runs `docker compose pull && up -d --no-build`,
-asserts the container stays up ~20s. To redeploy a specific image
-without code changes: `gh workflow run deploy.yml -f image_tag=<sha>`.
-`.env` lives only on the VPS (and locally); rotate via
-`scp ~/Work/discord-translate/.env kc-vprojects:/home/vladkarok/apps/discord-translate/.env`
-then re-run deploy. If something fails post-deploy, start with
-`ssh kc-vprojects 'cd apps/discord-translate && docker compose --env-file .env logs --tail 50 bot'`.
-The ECC plugin and dual-graph MCP no longer exist on this machine —
-ignore any stale references; use built-in retrieval and `/code-review`.
-No active task; open a fresh task file under `docs/agent/tasks/` when
-new multi-session work appears.
+The bot is live in production; the code-review hardening (c0c3d42 +
+727a53e) was pushed to master this session, which auto-deploys. First
+verify the deploy landed: `gh run list --limit 3` should show CI + deploy
+green, then
+`ssh kc-vprojects 'cd apps/discord-translate && docker compose --env-file .env ps'`
+should show image tag `:727a53e` (or later) and Up. If the container is
+unhealthy, check
+`ssh kc-vprojects 'cd apps/discord-translate && docker compose --env-file .env logs --tail 50 bot'`
+— rollback is `gh workflow run deploy.yml -f image_tag=0085a33`. Tests
+run with `npm test` (66 cases, tests/). No active task; the only loose
+end is the untracked `docs/plans/deep-research-report.md` (user
+decision: commit/delete/ignore).
 
 ## In flight
 
-- Nothing in flight.
-- `docs/plans/deep-research-report.md` is still untracked; pending
-  user decision (commit/delete/ignore).
+- Deploy of `727a53e` to prod (push + CI + deploy workflow) — verify
+  completion if this session was interrupted before confirmation.
+- `docs/plans/deep-research-report.md` still untracked; pending user
+  decision.
 
 ## Next
 
-1. (User decision) Resolve the untracked `deep-research-report.md`.
-2. (User-initiated, when usage demands) Open a task file for V1.x
-   polish (embed translation, attachment translation, per-user throttle)
-   or V2 (LLM tone mode, local MT, etc.) per
-   `docs/plans/discord-translation-bot.md` §Post-V1 Evolution.
+1. Confirm deploy green + container on `:727a53e` (verify-with below).
+2. (User decision) Resolve the untracked `deep-research-report.md`.
+3. Feature work when usage demands it (V1.x polish or V2 per
+   `docs/plans/discord-translation-bot.md` §Post-V1 Evolution) — open a
+   task file per AGENTS.md hard rule #6.
 
 ## Open questions / blockers
 
@@ -63,8 +62,9 @@ new multi-session work appears.
 - Local dev (Linux, Docker + Compose): bot container stopped to avoid
   Discord gateway conflict with prod.
   verify-with: `docker ps --filter name=discord-translate --format '{{.Names}} {{.Status}}'`
-- VPS (`ssh kc-vprojects`): healthy, image `ghcr.io/vladkarok/discord-translate:<sha>`
-  at `/home/vladkarok/apps/discord-translate`, SQLite in named volume
+- VPS (`ssh kc-vprojects`): expected image
+  `ghcr.io/vladkarok/discord-translate:727a53e` after this session's
+  deploy (was `:0085a33`, up 13 days, before it), SQLite in named volume
   `discord-translate_bot-data`.
   verify-with: `ssh kc-vprojects 'cd apps/discord-translate && docker compose --env-file .env ps'`
 - Runner (`ssh kc-github-runner`): user `gh-disctrans`, systemd unit

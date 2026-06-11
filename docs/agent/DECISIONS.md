@@ -47,3 +47,4 @@ Read on demand (look up "when did we decide X?"), not loaded on every
 2026-05-28 · Russian added as supported source/target language (Google v2 accepts `ru` natively) · docs/agent/sessions/2026-05-28-204630-claude-cicd-and-russian.md
 2026-06-11 · Dual-graph MCP removed from this repo — fixed per-session cost exceeds retrieval savings at 2.6k LOC; built-in Grep/Glob/Read preferred · docs/agent/sessions/2026-06-11-182111-claude-remove-dual-graph-mempalace.md
 2026-06-11 · ECC plugin uninstalled machine-wide; repo docs keep the generic "repo protocol wins over vendor machinery" rule, drop ECC-specific naming · docs/agent/sessions/2026-06-11-193852-claude-config-cleanup-ecc-removal.md
+2026-06-12 · Code-review pass: fail-closed /quota, ⟦N⟧ masking, languages.ts single source, v1.0.0, CI gates on 66-case vitest suite · sessions/2026-06-12-001455-claude-code-review-fixes-tests.md

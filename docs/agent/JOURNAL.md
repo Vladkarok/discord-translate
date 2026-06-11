@@ -64,3 +64,10 @@ Entry format:
 - Config hygiene follow-up: removed four dead dual-graph hooks from this repo's local settings; uninstalled the everything-claude-code plugin machine-wide (~58M, wrong-project summary injection was the last straw); modernized ~/.claude/settings.json (attribution properly disabled, MAX_THINKING_TOKENS 32000, away summary off).
 - Trimmed dead ECC references from global rules and from CLAUDE.md/AGENTS.md/PROTOCOL.md (generic vendor-collision rule retained); scanned all ~/Work Claude settings — one stale permission removed, the rest live by design.
 - see: docs/agent/sessions/2026-06-11-193852-claude-config-cleanup-ecc-removal.md
+
+## 2026-06-12 00:14 claude code-review-fixes-tests
+
+- Code-review hardening: 4 bugs + 6 polish items fixed (c0c3d42); first
+  test suite, 66 vitest cases, CI gates on npm test (727a53e).
+- Decision: version 1.0.0; src/languages.ts single source of truth.
+- see: docs/agent/sessions/2026-06-12-001455-claude-code-review-fixes-tests.md

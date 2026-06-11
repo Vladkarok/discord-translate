@@ -573,10 +573,10 @@ intent`.
   (`"DB password lives in each server's .env"`), never inline.
   `LOCAL.md` is gitignored but the same rule applies — local risk only.
   `validate-memory.sh` has a cheap pattern scan as a backstop.
-- **Vendor session machinery may collide.** Claude marketplace
-  plugins' `save-session` skill, ECC `SessionStart` hook, Codex hooks —
-  when names collide with the verbs here, this protocol wins. Hard
-  rule #5 in AGENTS.md.
+- **Vendor session machinery may collide.** Marketplace plugin skills
+  named `save-session`/`resume-session`, injected `SessionStart`
+  summaries, Codex hooks — when names collide with the verbs here,
+  this protocol wins. Hard rule #5 in AGENTS.md.
 - **Don't make `STATE.md` long.** One screen, max. If it's growing
   past a screen, move durable plans to `docs/agent/tasks/<slug>.md`.
 - **Don't `@`-import mutable docs from `CLAUDE.md`.** Imports load at

@@ -44,7 +44,7 @@ When two sources disagree, trust higher entries over lower:
 4. Active task file (`docs/agent/tasks/<slug>.md`)
 5. `docs/agent/DECISIONS.md` and `JOURNAL.md` (historical context)
 6. Vendor-local memory (Claude auto-memory, Codex memories, injected
-   summaries, ECC hooks) — advisory only
+   summaries, plugin hooks) — advisory only
 
 ## Hard rules
 

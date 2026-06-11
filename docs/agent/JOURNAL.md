@@ -58,3 +58,9 @@ Entry format:
 - Tooling hygiene, no code changes: removed dual-graph MCP from this repo (reverted its uncommitted CLAUDE.md/.gitignore edits, deleted `.dual-graph/`, dropped MCP entry) after token-cost analysis showed break-even-at-best on a 27-file codebase with its context store unused.
 - Uninstalled mempalace machine-wide (~610M freed; inactive since 2026-04-30). Kept dual-graph in `email-to-telegram-internal` (42k LOC — right scale) but flagged its index as 9 commits stale → re-scan there.
 - see: docs/agent/sessions/2026-06-11-182111-claude-remove-dual-graph-mempalace.md
+
+## 2026-06-11 19:38 claude config-cleanup-ecc-removal
+
+- Config hygiene follow-up: removed four dead dual-graph hooks from this repo's local settings; uninstalled the everything-claude-code plugin machine-wide (~58M, wrong-project summary injection was the last straw); modernized ~/.claude/settings.json (attribution properly disabled, MAX_THINKING_TOKENS 32000, away summary off).
+- Trimmed dead ECC references from global rules and from CLAUDE.md/AGENTS.md/PROTOCOL.md (generic vendor-collision rule retained); scanned all ~/Work Claude settings — one stale permission removed, the rest live by design.
+- see: docs/agent/sessions/2026-06-11-193852-claude-config-cleanup-ecc-removal.md

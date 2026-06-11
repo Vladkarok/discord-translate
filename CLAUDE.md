@@ -19,18 +19,12 @@ Claude Code's adapter on top of the shared `AGENTS.md` contract. Read
 - Claude auto-memory at `~/.claude/projects/<project>/memory/MEMORY.md`
   is **machine-local and advisory only**. The project's `MEMORY.md`
   holds a one-line pointer to `docs/agent/STATE.md`, not project facts.
-- Any `SessionStart` hook, `PreCompact` hook, or ECC summary is
-  **advisory only**. The ECC `SessionStart` hook from a global
-  marketplace plugin may fire and inject a "previous session summary"
-  from `~/.claude/sessions/` — always follow the `start session`
-  protocol in `docs/agent/PROTOCOL.md` instead.
-- The ECC `save-session` / `resume-session` skill names collide with
-  the verbs defined in AGENTS.md: when the user uses one of those
-  verbs, execute the protocol in `docs/agent/PROTOCOL.md` (which
-  writes to `docs/agent/`), **not** the ECC skill (which writes
-  machine-local Claude-only state).
-- If any other Claude skill or hook collides with
-  `docs/agent/PROTOCOL.md`, execute the repo protocol — not the skill.
+- Any injected `SessionStart`/`PreCompact` hook output or vendor
+  "previous session summary" is **advisory only** — always follow the
+  `start session` protocol in `docs/agent/PROTOCOL.md` instead.
+- If any Claude skill or hook collides with `docs/agent/PROTOCOL.md`
+  (e.g. a plugin skill named `save-session`/`resume-session`), execute
+  the repo protocol — not the skill.
 
 ## Imports
 

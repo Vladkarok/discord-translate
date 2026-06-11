@@ -1,23 +1,24 @@
 # State
 
 **Protocol version:** 2
-**Updated:** 2026-06-11T18:21:11+02:00
+**Updated:** 2026-06-11T19:38:52+02:00
 **Tool last wrote:** Claude Code
 **Branch:** master
 **Last code commit:** 0085a33c6abbe9c3e7be36f8219a6392ea2f2335 feat: add Russian as supported translation language
 **Code worktree:** clean
-**Tracked dirty code paths:** none
+**Tracked dirty code paths:** none (AGENTS.md/CLAUDE.md/PROTOCOL.md dirty are memory-tier, staged in this save)
 **Relevant untracked code paths:** docs/plans/deep-research-report.md — advisory research input from v1 plan refinement; user still hasn't decided to commit, delete, or .gitignore it
 **Active task:** none
-**Latest session read:** docs/agent/sessions/2026-05-28-204630-claude-cicd-and-russian.md
+**Latest session read:** docs/agent/sessions/2026-06-11-182111-claude-remove-dual-graph-mempalace.md
 
 ## Now
 
 v1 + CI/CD is in production; no code changes since 0085a33 (image
-`:0085a33` on the VPS, includes Russian). This session was machine-local
-tooling hygiene: removed the dual-graph MCP from this project (reverted
-its uncommitted CLAUDE.md/.gitignore edits, deleted `.dual-graph/`) and
-uninstalled mempalace entirely (~610M freed).
+`:0085a33` on the VPS, includes Russian). Today's two sessions were
+tooling hygiene: dual-graph MCP removed from this repo, mempalace and
+the everything-claude-code plugin uninstalled machine-wide, global
+rules files and this repo's identity docs trimmed of ECC-specific
+wording (generic vendor-collision rule retained).
 
 ## Resume prompt
 
@@ -33,10 +34,10 @@ without code changes: `gh workflow run deploy.yml -f image_tag=<sha>`.
 `scp ~/Work/discord-translate/.env kc-vprojects:/home/vladkarok/apps/discord-translate/.env`
 then re-run deploy. If something fails post-deploy, start with
 `ssh kc-vprojects 'cd apps/discord-translate && docker compose --env-file .env logs --tail 50 bot'`.
-This repo no longer uses the dual-graph MCP — do not expect
-`graph_continue` etc.; use built-in retrieval. No active task; open a
-fresh task file under `docs/agent/tasks/` when new multi-session work
-appears.
+The ECC plugin and dual-graph MCP no longer exist on this machine —
+ignore any stale references; use built-in retrieval and `/code-review`.
+No active task; open a fresh task file under `docs/agent/tasks/` when
+new multi-session work appears.
 
 ## In flight
 

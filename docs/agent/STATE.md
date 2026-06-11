@@ -1,7 +1,7 @@
 # State
 
 **Protocol version:** 2
-**Updated:** 2026-05-28T20:46:30+02:00
+**Updated:** 2026-06-11T18:21:11+02:00
 **Tool last wrote:** Claude Code
 **Branch:** master
 **Last code commit:** 0085a33c6abbe9c3e7be36f8219a6392ea2f2335 feat: add Russian as supported translation language
@@ -9,16 +9,15 @@
 **Tracked dirty code paths:** none
 **Relevant untracked code paths:** docs/plans/deep-research-report.md — advisory research input from v1 plan refinement; user still hasn't decided to commit, delete, or .gitignore it
 **Active task:** none
-**Latest session read:** docs/agent/sessions/2026-05-27-224000-claude-v1-complete.md
+**Latest session read:** docs/agent/sessions/2026-05-28-204630-claude-cicd-and-russian.md
 
 ## Now
 
-v1 + CI/CD is in production. Private repo `Vladkarok/discord-translate`
-on GitHub. Push-to-`master` builds image → pushes to GHCR → self-hosted
-runner deploys to VPS. Bot running on the VPS at
-`/home/vladkarok/apps/discord-translate`, currently image `:0085a33`
-(includes Russian language support). Local container stopped to avoid
-Discord gateway conflict.
+v1 + CI/CD is in production; no code changes since 0085a33 (image
+`:0085a33` on the VPS, includes Russian). This session was machine-local
+tooling hygiene: removed the dual-graph MCP from this project (reverted
+its uncommitted CLAUDE.md/.gitignore edits, deleted `.dual-graph/`) and
+uninstalled mempalace entirely (~610M freed).
 
 ## Resume prompt
 
@@ -34,8 +33,10 @@ without code changes: `gh workflow run deploy.yml -f image_tag=<sha>`.
 `scp ~/Work/discord-translate/.env kc-vprojects:/home/vladkarok/apps/discord-translate/.env`
 then re-run deploy. If something fails post-deploy, start with
 `ssh kc-vprojects 'cd apps/discord-translate && docker compose --env-file .env logs --tail 50 bot'`.
-No active task; open a fresh task file under `docs/agent/tasks/` when
-new multi-session work appears.
+This repo no longer uses the dual-graph MCP — do not expect
+`graph_continue` etc.; use built-in retrieval. No active task; open a
+fresh task file under `docs/agent/tasks/` when new multi-session work
+appears.
 
 ## In flight
 

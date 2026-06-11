@@ -52,3 +52,9 @@ Entry format:
 - Follow-on: added Russian (`ru`) to Google provider's accepted sets, SUPPORTED_LANGS list, and Discord LOCALE_TO_ISO map. Auto-deployed via the new pipeline.
 - Gotcha: VPS sshd silently rejects `from=10.0.89.2` without quotes; must be `from="10.0.89.2"`.
 - see: docs/agent/sessions/2026-05-28-204630-claude-cicd-and-russian.md
+
+## 2026-06-11 18:21 claude remove-dual-graph-mempalace
+
+- Tooling hygiene, no code changes: removed dual-graph MCP from this repo (reverted its uncommitted CLAUDE.md/.gitignore edits, deleted `.dual-graph/`, dropped MCP entry) after token-cost analysis showed break-even-at-best on a 27-file codebase with its context store unused.
+- Uninstalled mempalace machine-wide (~610M freed; inactive since 2026-04-30). Kept dual-graph in `email-to-telegram-internal` (42k LOC — right scale) but flagged its index as 9 commits stale → re-scan there.
+- see: docs/agent/sessions/2026-06-11-182111-claude-remove-dual-graph-mempalace.md

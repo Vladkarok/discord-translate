@@ -10,6 +10,7 @@
  */
 import { MessageFlags, type MessageContextMenuCommandInteraction } from 'discord.js';
 import { denialMessage, isOwner, resolveAccess } from '../access.js';
+import { isValidLang } from '../languages.js';
 import type { Config } from '../config.js';
 import type { OwnerPrefsRepository } from '../db/owner-prefs.js';
 import type { UsersRepository } from '../db/users.js';
@@ -39,14 +40,13 @@ const resolveInitialTarget = (
   interaction: MessageContextMenuCommandInteraction,
   deps: TranslateHandlerDeps,
 ): string => {
-  // 1. Saved user preference
-  if (isOwner(interaction.user.id, deps.config)) {
-    const saved = deps.ownerPrefs.get().target_language;
-    if (saved) return saved;
-  } else {
-    const saved = deps.users.getFriend(interaction.user.id)?.target_language;
-    if (saved) return saved;
-  }
+  // 1. Saved user preference. Guarded by isValidLang so a stale DB value
+  //    (language later dropped from SUPPORTED_LANGS) falls through to
+  //    locale/config instead of failing every translation.
+  const saved = isOwner(interaction.user.id, deps.config)
+    ? deps.ownerPrefs.get().target_language
+    : deps.users.getFriend(interaction.user.id)?.target_language;
+  if (saved && isValidLang(saved)) return saved;
   // 2. Discord locale
   const locale = interaction.locale;
   if (locale in LOCALE_TO_ISO) {
@@ -119,9 +119,9 @@ export const handleTranslate = async (
     embeds: payload.embeds ?? [],
     components: initialPanelFor({
       sessionId,
-      outcome,
       currentSource: 'auto',
       currentTarget: targetLang,
+      detectedSource: outcome.sourceLanguage,
     }),
   });
 };

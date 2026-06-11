@@ -6,7 +6,6 @@
  * aggregate — there is no private per-user data to hide here.
  */
 import { MessageFlags, type ChatInputCommandInteraction } from 'discord.js';
-import { InteractionContextType } from 'discord.js';
 import { denialMessage, resolveAccess } from '../access.js';
 import type { Config } from '../config.js';
 import type { ProviderUsageRepository } from '../db/provider-usage.js';
@@ -25,12 +24,9 @@ export const handleQuotaStatus = async (
 ): Promise<void> => {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  const access = resolveAccess(
-    interaction.user.id,
-    interaction.context ?? InteractionContextType.BotDM,
-    users,
-    config,
-  );
+  // Pass context as-is: resolveAccess fails closed on null/unknown,
+  // matching every other handler. No DM fallback.
+  const access = resolveAccess(interaction.user.id, interaction.context, users, config);
   if (!access.allowed) {
     log('warn', 'quota.denied', { userId: interaction.user.id, reason: access.reason });
     await interaction.editReply({ content: denialMessage(access.reason) });

@@ -4,6 +4,7 @@
  * interaction.
  */
 import { z } from 'zod';
+import { SUPPORTED_LANG_CODES, isValidLang } from './languages.js';
 
 const boolFromString = z.enum(['true', 'false']).transform((v) => v === 'true');
 
@@ -28,7 +29,12 @@ const envSchema = z.object({
   // applies them when the env var is unset.
   CACHE_STORE_SOURCE_TEXT: boolFromString.default(false),
   ALLOW_PAID_OVERFLOW: boolFromString.default(false),
-  DEFAULT_TARGET_LANGUAGE: z.string().min(2).default('en'),
+  DEFAULT_TARGET_LANGUAGE: z
+    .string()
+    .default('en')
+    .refine(isValidLang, {
+      message: `must be one of: ${SUPPORTED_LANG_CODES.join(', ')}`,
+    }),
   DATABASE_PATH: z.string().min(1).default('/data/bot.sqlite'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 

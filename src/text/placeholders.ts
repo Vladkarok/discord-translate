@@ -22,6 +22,10 @@
 
 const PROTECT_RE = new RegExp(
   [
+    // Literal placeholder-like tokens FIRST: if user text already contains
+    // `⟦7⟧`, mask it as a protected span. Otherwise rehydrate() would match
+    // it and throw out_of_range, making the message untranslatable.
+    /⟦\d+⟧/.source,
     /```[\s\S]*?```/.source, // fenced code blocks (multi-line, non-greedy)
     /`[^`\n]+`/.source, // inline code (single line)
     /https?:\/\/\S+/.source, // URLs

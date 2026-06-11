@@ -18,6 +18,7 @@
  * Run locally with:
  *   node --env-file=.env --enable-source-maps dist/index.js
  */
+import { readFileSync } from 'node:fs';
 import { loadConfig } from './config.js';
 import { log, setLogLevel } from './logger.js';
 import { COMMAND_DEFINITIONS } from './commands/definitions.js';
@@ -35,12 +36,22 @@ import { createTranslateService } from './services/translate.js';
 import { createSessionStore } from './sessions/store.js';
 
 const CACHE_RETENTION_DAYS = 30;
+const CACHE_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000; // re-prune daily
+const SHUTDOWN_WATCHDOG_MS = 5_000;
+
+// Resolves to <repo-or-image-root>/package.json from both src/ and dist/.
+const readVersion = (): string => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+    version?: string;
+  };
+  return pkg.version ?? 'unknown';
+};
 
 const main = async (): Promise<void> => {
   const config = loadConfig();
   setLogLevel(config.LOG_LEVEL);
 
-  log('info', 'bot.starting', { version: '0.5.0', node: process.version });
+  log('info', 'bot.starting', { version: readVersion(), node: process.version });
 
   const db = openDatabase(config.DATABASE_PATH);
   runMigrations(db);
@@ -49,10 +60,17 @@ const main = async (): Promise<void> => {
   const usage = createProviderUsageRepository(db);
   const cache = createTranslationCacheRepository(db);
 
-  const pruned = cache.prune(CACHE_RETENTION_DAYS);
-  if (pruned > 0) {
-    log('info', 'cache.pruned', { rows: pruned, retentionDays: CACHE_RETENTION_DAYS });
-  }
+  const pruneCache = (): void => {
+    const pruned = cache.prune(CACHE_RETENTION_DAYS);
+    if (pruned > 0) {
+      log('info', 'cache.pruned', { rows: pruned, retentionDays: CACHE_RETENTION_DAYS });
+    }
+  };
+  pruneCache();
+  // Boot-only pruning makes retention best-effort on a long-lived
+  // container; a daily sweep keeps the 30-day promise honest.
+  const pruneTimer = setInterval(pruneCache, CACHE_PRUNE_INTERVAL_MS);
+  pruneTimer.unref();
 
   const provider = createGoogleProvider({ apiKey: config.GOOGLE_TRANSLATE_API_KEY });
   const translateService = createTranslateService({
@@ -92,6 +110,13 @@ const main = async (): Promise<void> => {
 
   const shutdown = (signal: NodeJS.Signals): void => {
     log('info', 'bot.shutdown', { signal });
+    // If client.destroy() hangs, don't wait for Docker's SIGKILL.
+    const watchdog = setTimeout(() => {
+      log('error', 'bot.shutdown_forced', { afterMs: SHUTDOWN_WATCHDOG_MS });
+      process.exit(1);
+    }, SHUTDOWN_WATCHDOG_MS);
+    watchdog.unref();
+    clearInterval(pruneTimer);
     client
       .destroy()
       .catch((err: unknown) => {

@@ -88,7 +88,12 @@ export const createTranslateService = (deps: TranslateServiceDeps) => {
 
     // Protect non-translatable spans.
     const { masked, originals } = protect(req.text);
-    const sourceKey = req.sourceLanguage ?? 'auto';
+
+    // Normalize auto-detect: callers pass either `'auto'` or `undefined`.
+    // One representation from here down — `undefined` internally, `'auto'`
+    // in the cache key.
+    const source = req.sourceLanguage === 'auto' ? undefined : req.sourceLanguage;
+    const sourceKey = source ?? 'auto';
 
     // --- Cache lookup ---
     const cacheKey = deps.cache.computeKey({
@@ -149,11 +154,11 @@ export const createTranslateService = (deps: TranslateServiceDeps) => {
     let providerResult;
     try {
       const providerInput =
-        req.sourceLanguage === undefined
+        source === undefined
           ? { text: payload, targetLanguage: req.targetLanguage }
           : {
               text: payload,
-              sourceLanguage: req.sourceLanguage,
+              sourceLanguage: source,
               targetLanguage: req.targetLanguage,
             };
       providerResult = await deps.provider.translate(providerInput);

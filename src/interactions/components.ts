@@ -22,6 +22,7 @@ import {
   StringSelectMenuOptionBuilder,
   type MessageActionRowComponentBuilder,
 } from 'discord.js';
+import { SUPPORTED_LANGS } from '../languages.js';
 
 export const CUSTOM_ID = {
   source: 'dt:src:',
@@ -34,18 +35,7 @@ export const CUSTOM_ID = {
 
 export type PanelAction = 'src' | 'tgt' | 'sw' | 'sv' | 'show' | 'hide';
 
-export const SUPPORTED_LANGS = [
-  { value: 'en', label: 'English' },
-  { value: 'fr', label: 'French' },
-  { value: 'uk', label: 'Ukrainian' },
-  { value: 'ru', label: 'Russian' },
-] as const;
-
 const SOURCE_OPTIONS = [{ value: 'auto', label: 'Auto-detect' }, ...SUPPORTED_LANGS];
-
-export const isValidLang = (v: string): boolean => SUPPORTED_LANGS.some((l) => l.value === v);
-
-export const isValidSource = (v: string): boolean => v === 'auto' || isValidLang(v);
 
 export const buildPanel = (params: {
   readonly sessionId: string;

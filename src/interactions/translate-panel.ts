@@ -20,10 +20,11 @@ import type { OwnerPrefsRepository } from '../db/owner-prefs.js';
 import type { UsersRepository } from '../db/users.js';
 import { isOwner } from '../access.js';
 import { log } from '../logger.js';
-import type { TranslateService, TranslateSuccess } from '../services/translate.js';
+import type { TranslateService } from '../services/translate.js';
 import { renderTranslation } from '../text/render.js';
 import type { SessionStore, TranslationSession } from '../sessions/store.js';
-import { buildPanel, isValidLang, isValidSource, parseCustomId } from './components.js';
+import { isValidLang, isValidSource } from '../languages.js';
+import { buildPanel, parseCustomId } from './components.js';
 
 export interface PanelDeps {
   readonly config: Config;
@@ -115,6 +116,7 @@ const handleToggle = async (
   if (!updated) {
     await interaction.editReply({
       content: 'Session expired mid-action. Right-click the message and run **Translate** again.',
+      embeds: [],
       components: [],
     });
     return;
@@ -124,7 +126,7 @@ const handleToggle = async (
       sessionId,
       currentSource: updated.currentSource,
       currentTarget: updated.currentTarget,
-      canSwap: canSwap(updated),
+      canSwap: canSwap(updated.currentSource, updated.lastDetectedSource),
       expanded: updated.panelExpanded,
     }),
   });
@@ -234,11 +236,14 @@ const rerunAndPaint = async (
     log('warn', 'panel.translate_failed', { kind: outcome.kind });
     await interaction.editReply({
       content: outcome.message,
+      // Clear the previous translation's embeds — otherwise Discord keeps
+      // them under the error text.
+      embeds: [],
       components: buildPanel({
         sessionId,
         currentSource: next.currentSource,
         currentTarget: next.currentTarget,
-        canSwap: canSwap(next),
+        canSwap: canSwap(next.currentSource, next.lastDetectedSource),
         expanded: next.panelExpanded,
       }),
     });
@@ -255,6 +260,7 @@ const rerunAndPaint = async (
     // Race with sweep — session expired between get and update.
     await interaction.editReply({
       content: 'Session expired mid-action. Right-click the message and run **Translate** again.',
+      embeds: [],
       components: [],
     });
     return;
@@ -268,38 +274,29 @@ const rerunAndPaint = async (
       sessionId,
       currentSource: updated.currentSource,
       currentTarget: updated.currentTarget,
-      canSwap: canSwap(updated),
+      canSwap: canSwap(updated.currentSource, updated.lastDetectedSource),
       expanded: updated.panelExpanded,
     }),
   });
 };
 
-const canSwap = (s: TranslationSession): boolean => {
-  if (s.currentSource === 'auto') {
-    return s.lastDetectedSource !== null && isValidLang(s.lastDetectedSource);
+const canSwap = (source: string, lastDetectedSource: string | null): boolean => {
+  if (source === 'auto') {
+    return lastDetectedSource !== null && isValidLang(lastDetectedSource);
   }
-  return isValidLang(s.currentSource);
+  return isValidLang(source);
 };
 
 export const initialPanelFor = (params: {
   readonly sessionId: string;
-  readonly outcome: TranslateSuccess;
   readonly currentSource: string;
   readonly currentTarget: string;
+  readonly detectedSource: string | null;
 }): ReturnType<typeof buildPanel> =>
   buildPanel({
     sessionId: params.sessionId,
     currentSource: params.currentSource,
     currentTarget: params.currentTarget,
-    canSwap: canSwap({
-      userId: '',
-      originalText: '',
-      currentSource: params.currentSource,
-      currentTarget: params.currentTarget,
-      lastDetectedSource: params.outcome.sourceLanguage,
-      panelExpanded: false,
-      createdAt: 0,
-      expiresAt: 0,
-    }),
+    canSwap: canSwap(params.currentSource, params.detectedSource),
     expanded: false, // Panel starts collapsed; user opens it via the ⚙ toggle.
   });

@@ -2,7 +2,8 @@
  * Google Cloud Translation v2 adapter (API-key auth).
  *
  * Endpoint:
- *   POST https://translation.googleapis.com/language/translate/v2?key=KEY
+ *   POST https://translation.googleapis.com/language/translate/v2
+ *   header x-goog-api-key: KEY
  *   { q: [text], target: 'en', source?: 'fr', format: 'html' }
  *
  * Billing: Google bills the total length of the `q` strings sent,
@@ -15,15 +16,17 @@
  *
  * Free tier: 500K characters/month total (Basic + Advanced). Permanent.
  */
+import { SUPPORTED_LANG_CODES } from '../languages.js';
 import { ProviderError, type TranslationProvider } from './types.js';
 
 const ENDPOINT = 'https://translation.googleapis.com/language/translate/v2';
 const PROVIDER_NAME = 'google';
 
-// Google v2 accepts ISO 639-1 codes. Our internal `en`, `fr`, `uk`, `ru`
-// map 1:1 (no regional variants required).
-const SUPPORTED_TARGETS = new Set(['en', 'fr', 'uk', 'ru']);
-const SUPPORTED_SOURCES = new Set(['en', 'fr', 'uk', 'ru', 'auto']);
+// Google v2 accepts ISO 639-1 codes. Our internal codes map 1:1 (no
+// regional variants required), so the app-wide list is also the
+// provider-supported list.
+const SUPPORTED_TARGETS = new Set<string>(SUPPORTED_LANG_CODES);
+const SUPPORTED_SOURCES = new Set<string>([...SUPPORTED_LANG_CODES, 'auto']);
 
 export interface GoogleProviderOptions {
   readonly apiKey: string;
@@ -81,9 +84,14 @@ export const createGoogleProvider = (opts: GoogleProviderOptions): TranslationPr
 
       let res: Response;
       try {
-        res = await fetchImpl(`${ENDPOINT}?key=${encodeURIComponent(opts.apiKey)}`, {
+        // Key travels in a header, not the query string — keeps it out of
+        // anything that ever logs a URL.
+        res = await fetchImpl(ENDPOINT, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: {
+            'content-type': 'application/json',
+            'x-goog-api-key': opts.apiKey,
+          },
           body: JSON.stringify(body),
           signal: controller.signal,
         });

@@ -1,6 +1,6 @@
 {
   "name": "discord-translate",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Personal Discord translation bot (DeepL Free, ephemeral message-context translate)",
   "license": "UNLICENSED",
